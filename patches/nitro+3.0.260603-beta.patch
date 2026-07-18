@@ -1,0 +1,15 @@
+diff --git a/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs b/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs
+index c85effc..bb6fb18 100644
+--- a/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs
++++ b/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs
+@@ -14,7 +14,9 @@ export async function handle(context, req) {
+ 		
+ 		url = "/api/" + (req.params.url || "");
+ 	}
+-	const request = new Request(url, {
++	const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
++	const proto = req.headers["x-forwarded-proto"] || "https";
++	const request = new Request(`${proto}://${host}${url}`, {
+ 		method: req.method || undefined,
+ 
+ 
