@@ -6,6 +6,7 @@ on:
     paths:
       - "src/**"
       - "public/**"
+      - "patches/**"
       - "package.json"
       - "package-lock.json"
       - "vite.config.ts"
