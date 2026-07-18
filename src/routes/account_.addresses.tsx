@@ -10,6 +10,7 @@ import {
   type AddressInput,
 } from "@/lib/account";
 import { AccountShell } from "@/components/site/AccountShell";
+import { PhoneInput } from "@/components/site/PhoneInput";
 
 export const Route = createFileRoute("/account_/addresses")({
   head: () => ({ meta: [{ title: "Addresses — Cut & Cult" }, { name: "robots", content: "noindex" }] }),
@@ -24,7 +25,7 @@ const EMPTY_FORM: AddressInput = {
   city: "",
   state: "",
   postal_code: "",
-  country: "",
+  country: "India",
   is_default: false,
 };
 
@@ -128,14 +129,19 @@ export function AddressForm({
       <div className="text-eyebrow mb-2">{addressId === null ? "New address" : "Edit address"}</div>
       <div className="grid grid-cols-2 gap-4">
         <Input label="Full name" required value={form.full_name} onChange={set("full_name")} />
-        <Input label="Phone" required value={form.phone} onChange={set("phone")} placeholder="+1 555 000 0000" />
+        <PhoneInput
+          label="Phone"
+          value={form.phone}
+          onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
+          required
+        />
       </div>
       <Input label="Address line 1" required value={form.line1} onChange={set("line1")} />
       <Input label="Address line 2" value={form.line2} onChange={set("line2")} />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Input label="City" required value={form.city} onChange={set("city")} />
-        <Input label="State" value={form.state} onChange={set("state")} />
-        <Input label="Postal code" required value={form.postal_code} onChange={set("postal_code")} />
+        <Input label="State" value={form.state} onChange={set("state")} placeholder="e.g. Maharashtra" />
+        <Input label="PIN code" required value={form.postal_code} onChange={set("postal_code")} maxLength={6} inputMode="numeric" />
         <Input label="Country" required value={form.country} onChange={set("country")} />
       </div>
       <label className="flex items-center gap-3 text-eyebrow pt-2">

@@ -9,6 +9,9 @@ export type User = {
   mobile: string;
   avatar: string | null;
   is_staff: boolean;
+  // Hooks for upcoming OTP/email-verification flows; always false until those exist.
+  is_email_verified: boolean;
+  is_mobile_verified: boolean;
 };
 
 type AuthCtx = {

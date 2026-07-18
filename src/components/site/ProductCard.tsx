@@ -54,11 +54,11 @@ export function ProductCard({ p, index = 0 }: { p: ProductListItem; index?: numb
           <div className="text-sm font-medium shrink-0">
             {p.discount_price != null ? (
               <span className="flex items-baseline gap-2">
-                <span>${p.discount_price.toFixed(0)}</span>
-                <span className="text-muted-foreground line-through text-xs">${p.price.toFixed(0)}</span>
+                <span>₹{p.discount_price.toFixed(0)}</span>
+                <span className="text-muted-foreground line-through text-xs">₹{p.price.toFixed(0)}</span>
               </span>
             ) : (
-              <>${p.price.toFixed(0)}</>
+              <>₹{p.price.toFixed(0)}</>
             )}
           </div>
         </div>

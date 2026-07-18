@@ -16,6 +16,10 @@ dist-ssr
 .nitro
 *.local
 
+# Nitro azure-swa preset regenerates this at build time (see package.json
+# build:azure) — never hand-edit or commit it.
+/staticwebapp.config.json
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

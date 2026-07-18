@@ -3,6 +3,8 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
+from apps.common.views import HealthView
+
 api_patterns = [
     path("auth/", include("apps.accounts.urls")),
     path("categories/", include("apps.categories.urls")),
@@ -24,8 +26,10 @@ api_patterns = [
 ]
 
 urlpatterns = [
+    path("health/", HealthView.as_view()),
     path("django-admin/", admin.site.urls),
     path("api/", include(api_patterns)),
+    path("api/health/", HealthView.as_view()),
 ]
 
 if settings.DEBUG:

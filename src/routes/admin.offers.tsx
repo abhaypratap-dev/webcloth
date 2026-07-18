@@ -53,7 +53,7 @@ function AdminOffers() {
             <tr key={o.id}>
               <Td className="font-medium">{o.name}</Td>
               <Td>{KIND_LABELS[o.kind]}</Td>
-              <Td>{o.discount_type === "percent" ? `${o.discount_value}%` : `$${o.discount_value}`}</Td>
+              <Td>{o.discount_type === "percent" ? `${o.discount_value}%` : `₹${o.discount_value}`}</Td>
               <Td className="text-muted-foreground text-xs">
                 {new Date(o.start_at).toLocaleDateString()} → {o.end_at ? new Date(o.end_at).toLocaleDateString() : "∞"}
               </Td>

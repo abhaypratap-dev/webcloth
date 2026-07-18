@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { SkullMark } from "@/components/site/Logo";
+import { PhoneInput } from "@/components/site/PhoneInput";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Account — Cut & Cult" }, { name: "robots", content: "noindex" }] }),
@@ -89,15 +90,8 @@ function Auth() {
                   className="w-full bg-transparent border-b border-hairline focus:border-bone py-3 outline-none text-sm"
                 />
               </Field>
-              <Field label="Mobile number">
-                <input
-                  type="tel"
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value)}
-                  placeholder="+1 555 000 0000"
-                  className="w-full bg-transparent border-b border-hairline focus:border-bone py-3 outline-none text-sm placeholder:text-muted-foreground/40"
-                />
-              </Field>
+              <PhoneInput label="Mobile number" value={mobile} onChange={setMobile} required />
+
             </>
           )}
           <Field label="Email">

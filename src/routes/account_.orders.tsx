@@ -77,7 +77,7 @@ function OrderCard({
           <span className="text-eyebrow border border-hairline px-3 py-1">
             {ORDER_STATUS_LABELS[order.status] ?? order.status}
           </span>
-          <span className="text-sm font-medium">${order.total.toFixed(2)}</span>
+          <span className="text-sm font-medium">₹{order.total.toFixed(2)}</span>
           <span className="text-lg">{open ? "−" : "+"}</span>
         </div>
       </button>
@@ -102,19 +102,19 @@ function OrderCard({
                       {[item.size, item.color].filter(Boolean).join(" · ")} · Qty {item.quantity}
                     </div>
                   </div>
-                  <div className="text-sm">${item.line_total.toFixed(2)}</div>
+                  <div className="text-sm">₹{item.line_total.toFixed(2)}</div>
                 </li>
               ))}
             </ul>
             <div className="mt-4 space-y-2 border-t border-hairline pt-4 text-sm text-muted-foreground">
-              <Row label="Subtotal" value={`$${order.subtotal.toFixed(2)}`} />
+              <Row label="Subtotal" value={`₹${order.subtotal.toFixed(2)}`} />
               {order.discount > 0 && (
-                <Row label={`Discount${order.coupon_code ? ` (${order.coupon_code})` : ""}`} value={`−$${order.discount.toFixed(2)}`} />
+                <Row label={`Discount${order.coupon_code ? ` (${order.coupon_code})` : ""}`} value={`−₹${order.discount.toFixed(2)}`} />
               )}
-              <Row label="Shipping" value={`$${order.shipping.toFixed(2)}`} />
-              {order.tax > 0 && <Row label="Tax" value={`$${order.tax.toFixed(2)}`} />}
+              <Row label="Shipping" value={`₹${order.shipping.toFixed(2)}`} />
+              {order.tax > 0 && <Row label="Tax (GST)" value={`₹${order.tax.toFixed(2)}`} />}
               <div className="flex justify-between text-bone font-medium pt-2 border-t border-hairline">
-                <span>Total</span><span>${order.total.toFixed(2)}</span>
+                <span>Total</span><span>₹{order.total.toFixed(2)}</span>
               </div>
             </div>
           </div>

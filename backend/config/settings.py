@@ -68,6 +68,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -105,6 +106,9 @@ DATABASES = {
         "HOST": env("POSTGRES_HOST", "localhost"),
         "PORT": env("POSTGRES_PORT", "5432"),
         "CONN_MAX_AGE": int(env("POSTGRES_CONN_MAX_AGE", "60")),
+        # Azure Database for PostgreSQL requires TLS by default — set
+        # POSTGRES_SSLMODE=require in production. "prefer" is safe locally.
+        "OPTIONS": {"sslmode": env("POSTGRES_SSLMODE", "prefer")},
     }
 }
 
@@ -128,6 +132,37 @@ MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ---------------------------------------------------------------------------
+# File storage
+# ---------------------------------------------------------------------------
+# Static files: WhiteNoise serves them directly from the App Service process
+# (no separate CDN needed). Manifest storage requires `collectstatic` to have
+# run first, so it's only used once DEBUG is off — `runserver` in dev serves
+# static files straight from source without needing a manifest.
+_STATICFILES_BACKEND = (
+    "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    if not DEBUG
+    else "django.contrib.staticfiles.storage.StaticFilesStorage"
+)
+
+# Media (product images, avatars, etc): App Service's local disk is NOT
+# persistent across deploys/restarts/scale-out, so production should point
+# this at Azure Blob Storage. Falls back to local disk when unconfigured
+# (e.g. local dev) so nothing else needs to change to run without it.
+AZURE_STORAGE_ACCOUNT_NAME = env("AZURE_STORAGE_ACCOUNT_NAME", "")
+AZURE_STORAGE_ACCOUNT_KEY = env("AZURE_STORAGE_ACCOUNT_KEY", "")
+AZURE_STORAGE_CONTAINER = env("AZURE_STORAGE_CONTAINER", "media")
+
+if AZURE_STORAGE_ACCOUNT_NAME:
+    _DEFAULT_FILE_BACKEND = "storages.backends.azure_storage.AzureStorage"
+else:
+    _DEFAULT_FILE_BACKEND = "django.core.files.storage.FileSystemStorage"
+
+STORAGES = {
+    "default": {"BACKEND": _DEFAULT_FILE_BACKEND},
+    "staticfiles": {"BACKEND": _STATICFILES_BACKEND},
+}
 
 # ---------------------------------------------------------------------------
 # REST framework
@@ -198,6 +233,17 @@ STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", "")
 # ---------------------------------------------------------------------------
 # Security hardening (effective when DEBUG=False)
 # ---------------------------------------------------------------------------
+X_FRAME_OPTIONS = "DENY"
+
+# Azure App Service / Front Door terminate TLS in front of the app and
+# forward the original scheme via this header — needed for SECURE_SSL_REDIRECT
+# and request.is_secure() to work correctly behind the proxy.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Needed once a custom domain (or the *.azurewebsites.net / *.azurestaticapps.net
+# domain) POSTs to Django (e.g. the Django admin login form).
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
+
 if not DEBUG:
     SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", True)
     SESSION_COOKIE_SECURE = True
@@ -207,7 +253,6 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "same-origin"
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Uploaded files: cap request body size (secure file uploads)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024

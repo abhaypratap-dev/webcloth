@@ -161,7 +161,7 @@ function Checkout() {
                 initial={{
                   full_name: auth.user?.full_name ?? "",
                   phone: auth.user?.mobile ?? "",
-                  line1: "", line2: "", city: "", state: "", postal_code: "", country: "",
+                  line1: "", line2: "", city: "", state: "", postal_code: "", country: "India",
                   is_default: (addresses?.length ?? 0) === 0,
                 }}
                 addressId={null}
@@ -205,7 +205,7 @@ function Checkout() {
 
           {error && <p className="text-xs text-destructive">{error}</p>}
           <button disabled={placing} className="btn-cult w-full">
-            {placing ? "Placing order…" : `Place order — $${cart.total.toFixed(2)}`}
+            {placing ? "Placing order…" : `Place order — ₹${cart.total.toFixed(2)}`}
           </button>
         </form>
 
@@ -221,7 +221,7 @@ function Checkout() {
                     {[i.size, i.color].filter(Boolean).join(" · ")} · Qty {i.quantity}
                   </div>
                 </div>
-                <div className="text-sm">${(i.price * i.quantity).toFixed(2)}</div>
+                <div className="text-sm">₹{(i.price * i.quantity).toFixed(2)}</div>
               </li>
             ))}
           </ul>
@@ -256,11 +256,11 @@ function Checkout() {
           </div>
 
           <div className="mt-6 space-y-3 border-t border-hairline pt-6 text-sm">
-            <Row label="Subtotal" value={`$${cart.subtotal.toFixed(2)}`} />
-            {cart.discount > 0 && <Row label="Discount" value={`−$${cart.discount.toFixed(2)}`} />}
-            <Row label="Shipping" value={cart.shipping === 0 ? "Free" : `$${cart.shipping.toFixed(2)}`} />
-            {cart.tax > 0 && <Row label="Tax" value={`$${cart.tax.toFixed(2)}`} />}
-            <Row label="Total" value={`$${cart.total.toFixed(2)}`} bold />
+            <Row label="Subtotal" value={`₹${cart.subtotal.toFixed(2)}`} />
+            {cart.discount > 0 && <Row label="Discount" value={`−₹${cart.discount.toFixed(2)}`} />}
+            <Row label="Shipping" value={cart.shipping === 0 ? "Free" : `₹${cart.shipping.toFixed(2)}`} />
+            {cart.tax > 0 && <Row label="Tax (GST)" value={`₹${cart.tax.toFixed(2)}`} />}
+            <Row label="Total" value={`₹${cart.total.toFixed(2)}`} bold />
           </div>
         </aside>
       </div>

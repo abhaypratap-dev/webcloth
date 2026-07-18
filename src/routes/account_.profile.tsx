@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { AccountShell } from "@/components/site/AccountShell";
+import { PhoneInput } from "@/components/site/PhoneInput";
 
 export const Route = createFileRoute("/account_/profile")({
   head: () => ({ meta: [{ title: "Profile — Cut & Cult" }, { name: "robots", content: "noindex" }] }),
@@ -63,13 +64,8 @@ function ProfileForm() {
           className="w-full bg-transparent border-b border-hairline focus:border-bone py-3 outline-none text-sm"
         />
       </Field>
-      <Field label="Mobile number">
-        <input
-          value={mobile}
-          onChange={(e) => setMobile(e.target.value)}
-          className="w-full bg-transparent border-b border-hairline focus:border-bone py-3 outline-none text-sm"
-        />
-      </Field>
+      <PhoneInput label="Mobile number" value={mobile} onChange={setMobile} required />
+
       {message && <p className="text-xs text-muted-foreground">{message}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
       <button disabled={saving} className="btn-cult">{saving ? "…" : "Save changes"}</button>

@@ -82,13 +82,13 @@ function AdminSettings() {
           </div>
         </Section>
 
-        <Section title="Shipping & tax">
+        <Section title="Shipping & GST">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Input label="Currency" value={form.currency} onChange={(e) => set("currency", e.target.value)} />
             <Input label="Symbol" value={form.currency_symbol} onChange={(e) => set("currency_symbol", e.target.value)} />
             <Input label="Flat shipping" type="number" step="0.01" value={form.shipping_flat_rate}
               onChange={(e) => set("shipping_flat_rate", e.target.value)} />
-            <Input label="Tax %" type="number" step="0.01" value={form.tax_percent}
+            <Input label="GST %" type="number" step="0.01" value={form.tax_percent}
               onChange={(e) => set("tax_percent", e.target.value)} />
           </div>
           <Input label="Free shipping over (blank to disable)" type="number" step="0.01"

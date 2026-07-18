@@ -1,9 +1,9 @@
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
-from django.core.validators import RegexValidator
 from django.db import models
 
 from apps.common.models import TimeStampedModel
+from .phone import indian_mobile_validator
 
 
 class UserManager(BaseUserManager):
@@ -28,18 +28,22 @@ class UserManager(BaseUserManager):
         return self._create_user(email, password, **extra_fields)
 
 
-mobile_validator = RegexValidator(r"^\+?[0-9]{7,15}$", "Enter a valid mobile number.")
-
-
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, db_index=True)
     full_name = models.CharField(max_length=150)
-    mobile = models.CharField(max_length=16, blank=True, validators=[mobile_validator], db_index=True)
+    # Stored canonical: +91XXXXXXXXXX (see apps.accounts.phone). blank=True keeps
+    # staff/seed accounts creatable without one; RegisterSerializer requires it.
+    mobile = models.CharField(max_length=16, blank=True, validators=[indian_mobile_validator], db_index=True)
     avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_blocked = models.BooleanField(default=False)
+
+    # Hooks for upcoming OTP/email-verification flows. Unused (always False)
+    # until those flows exist — login/registration don't gate on them yet.
+    is_email_verified = models.BooleanField(default=False)
+    is_mobile_verified = models.BooleanField(default=False)
 
     date_joined = models.DateTimeField(auto_now_add=True)
 
@@ -58,13 +62,13 @@ class User(AbstractBaseUser, PermissionsMixin):
 class Address(TimeStampedModel):
     user = models.ForeignKey(User, related_name="addresses", on_delete=models.CASCADE)
     full_name = models.CharField(max_length=150)
-    phone = models.CharField(max_length=16, validators=[mobile_validator])
+    phone = models.CharField(max_length=16, validators=[indian_mobile_validator])
     line1 = models.CharField(max_length=255)
     line2 = models.CharField(max_length=255, blank=True)
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100, blank=True)
-    postal_code = models.CharField(max_length=20)
-    country = models.CharField(max_length=100)
+    postal_code = models.CharField(max_length=20)  # PIN code
+    country = models.CharField(max_length=100, default="India")
     is_default = models.BooleanField(default=False)
 
     class Meta:

@@ -47,8 +47,8 @@ function AdminCoupons() {
             <tr key={c.id}>
               <Td className="font-medium">{c.code}</Td>
               <Td>{TYPE_LABELS[c.discount_type]}</Td>
-              <Td>{c.discount_type === "free_shipping" ? "—" : c.discount_type === "percent" ? `${c.discount_value}%` : `$${c.discount_value}`}</Td>
-              <Td className="text-muted-foreground">${c.min_order_value}</Td>
+              <Td>{c.discount_type === "free_shipping" ? "—" : c.discount_type === "percent" ? `${c.discount_value}%` : `₹${c.discount_value}`}</Td>
+              <Td className="text-muted-foreground">₹{c.min_order_value}</Td>
               <Td>{c.used_count}{c.usage_limit ? ` / ${c.usage_limit}` : ""}</Td>
               <Td className="text-muted-foreground">
                 {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "—"}

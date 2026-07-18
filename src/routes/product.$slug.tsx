@@ -104,10 +104,10 @@ function ProductPage() {
           <p className="text-eyebrow">{p.category?.replace(/-/g, " ")}</p>
           <h1 className="mt-4 text-large-display text-[2rem] md:text-[3rem] leading-[0.95]">{p.title}</h1>
           <div className="mt-6 flex items-baseline gap-3">
-            <span className="text-xl">${price.toFixed(0)}</span>
+            <span className="text-xl">₹{price.toFixed(0)}</span>
             {p.discount_price != null && (
               <>
-                <span className="text-sm text-muted-foreground line-through">${p.price.toFixed(0)}</span>
+                <span className="text-sm text-muted-foreground line-through">₹{p.price.toFixed(0)}</span>
                 <span className="text-eyebrow text-bone/80">−{p.discount_percent}%</span>
               </>
             )}
@@ -213,7 +213,7 @@ function ProductPage() {
             )}
             <Accordion title="Shipping & Returns">
               <p className="text-sm leading-relaxed text-muted-foreground">
-                Complimentary shipping over $200. 14-day returns on unworn pieces with tags attached.
+                Free shipping over ₹1,999. 14-day returns on unworn pieces with tags attached.
               </p>
             </Accordion>
             <Accordion title={`Reviews (${reviews?.length ?? 0})`}>

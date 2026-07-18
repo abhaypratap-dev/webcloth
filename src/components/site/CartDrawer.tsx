@@ -66,7 +66,7 @@ export function CartDrawer() {
                             <span className="text-xs w-6 text-center">{i.quantity}</span>
                             <button onClick={() => cart.setQty(i.id, i.quantity + 1)} className="p-2 hover:bg-bone/5"><Plus className="h-3 w-3" /></button>
                           </div>
-                          <div className="text-sm font-medium">${(i.price * i.quantity).toFixed(2)}</div>
+                          <div className="text-sm font-medium">₹{(i.price * i.quantity).toFixed(2)}</div>
                         </div>
                       </div>
                     </li>
@@ -79,7 +79,7 @@ export function CartDrawer() {
               <footer className="border-t border-hairline p-6 space-y-4">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-eyebrow">Subtotal</span>
-                  <span className="font-medium">${cart.subtotal.toFixed(2)}</span>
+                  <span className="font-medium">₹{cart.subtotal.toFixed(2)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground">Shipping and taxes calculated at checkout.</p>
                 <Link to="/checkout" onClick={cart.close} className="btn-cult w-full">Checkout</Link>

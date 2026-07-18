@@ -77,7 +77,7 @@ function Dashboard() {
               />
               <YAxis
                 tick={{ fill: MUTED, fontSize: 10 }}
-                tickFormatter={(v: number) => `$${v}`}
+                tickFormatter={(v: number) => `₹${v}`}
                 axisLine={false}
                 tickLine={false}
                 width={48}
@@ -111,7 +111,7 @@ function Dashboard() {
               />
               <YAxis
                 tick={{ fill: MUTED, fontSize: 10 }}
-                tickFormatter={(v: number) => `$${v}`}
+                tickFormatter={(v: number) => `₹${v}`}
                 axisLine={false}
                 tickLine={false}
                 width={48}

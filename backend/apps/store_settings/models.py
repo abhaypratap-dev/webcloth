@@ -19,13 +19,15 @@ class StoreSettings(TimeStampedModel):
     facebook_url = models.URLField(blank=True)
     youtube_url = models.URLField(blank=True)
 
-    currency = models.CharField(max_length=3, default="USD")
-    currency_symbol = models.CharField(max_length=3, default="$")
-    shipping_flat_rate = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("10.00"))
+    currency = models.CharField(max_length=3, default="INR")
+    currency_symbol = models.CharField(max_length=3, default="₹")
+    shipping_flat_rate = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("99.00"))
     free_shipping_threshold = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True, default=Decimal("200.00")
+        max_digits=10, decimal_places=2, null=True, blank=True, default=Decimal("1999.00")
     )
-    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    # GST rate. Kept as a single blended percentage — split into CGST/SGST/IGST
+    # at invoicing time if that level of detail becomes necessary.
+    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("18.00"))
 
     order_email_enabled = models.BooleanField(default=True)
 

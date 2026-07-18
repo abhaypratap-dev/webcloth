@@ -221,5 +221,5 @@ export function useEditor<T>() {
 }
 
 export function money(n: number | string): string {
-  return `$${Number(n).toFixed(2)}`;
+  return `₹${Number(n).toFixed(2)}`;
 }
