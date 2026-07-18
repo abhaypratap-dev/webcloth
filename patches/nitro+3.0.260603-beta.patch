@@ -1,5 +1,5 @@
 diff --git a/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs b/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs
-index c85effc..bb6fb18 100644
+index c85effc..9f296f2 100644
 --- a/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs
 +++ b/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs
 @@ -14,7 +14,9 @@ export async function handle(context, req) {
@@ -11,5 +11,14 @@ index c85effc..bb6fb18 100644
 +	const proto = req.headers["x-forwarded-proto"] || "https";
 +	const request = new Request(`${proto}://${host}${url}`, {
  		method: req.method || undefined,
+ 		
+ 		
+@@ -25,7 +27,7 @@ export async function handle(context, req) {
  
- 
+ 	context.res = {
+ 		status: response.status,
+-		body: response.body,
++		body: Buffer.from(await response.arrayBuffer()),
+ 		cookies: getAzureParsedCookiesFromHeaders(response.headers),
+ 		headers: Object.fromEntries([...response.headers.entries()].filter(([key]) => key !== "set-cookie"))
+ 	};
