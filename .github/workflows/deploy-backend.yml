@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: ${{ steps.deploy.outputs.webapp-url }}
+      url: https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net
     steps:
       - uses: actions/checkout@v4
 
@@ -25,8 +25,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Django's `check --deploy` catches missing/weak production settings
-      # before they ever reach Azure.
+      # Django's `check` catches missing/broken settings before they ever
+      # reach Azure.
       - name: Install dependencies and run checks
         working-directory: backend
         run: |
@@ -44,18 +44,30 @@ jobs:
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
           POSTGRES_SSLMODE: require
 
-      - name: Deploy to Azure App Service
-        id: deploy
-        uses: azure/webapps-deploy@v3
+      - name: Package backend
+        working-directory: backend
+        run: zip -r ../backend.zip . -x ".venv/*" "__pycache__/*" "*.pyc" "**/__pycache__/*" "media/*" "staticfiles/*" -q
+
+      - uses: azure/login@v2
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: backend
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure App Service
+        run: |
+          az webapp deploy \
+            --resource-group cutcult-rg \
+            --name "${{ env.AZURE_WEBAPP_NAME }}" \
+            --src-path backend.zip \
+            --type zip
 
       # Azure App Service restarts the container on deploy, which runs
       # startup.sh (migrate + collectstatic + gunicorn) automatically —
       # no separate migration step is needed here.
       - name: Verify health endpoint
         run: |
-          sleep 20
-          curl -f "${{ steps.deploy.outputs.webapp-url }}/health/" || (echo "Health check failed" && exit 1)
+          sleep 30
+          curl -f "https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net/health/" || (echo "Health check failed" && exit 1)
+
+      - name: Azure logout
+        if: always()
+        run: az logout
