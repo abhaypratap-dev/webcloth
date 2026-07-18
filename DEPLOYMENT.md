@@ -13,7 +13,7 @@ Resources already provisioned for this project (Central India / East Asia):
 | Resource group | `cutcult-rg` | Central India |
 | App Service plan | `cutcult-plan` | Linux, B1 |
 | Backend Web App | `cutcult-api` | `https://cutcult-api.azurewebsites.net`, Python 3.12 |
-| Static Web App | `cutcult-web` | `https://lemon-tree-079d4be00.7.azurestaticapps.net`, East Asia, Free tier |
+| Static Web App | `cutcult-web` | `https://lemon-tree-079d4be00.7.azurestaticapps.net`, East Asia, **Standard tier** (see Known Issues — Free tier's Managed Functions support was unreliable for this app) |
 
 > Azure Static Web Apps has no India region yet (only Central US, East US 2,
 > West US 2, West Europe, East Asia at time of writing) — East Asia was
@@ -25,6 +25,58 @@ Resources already provisioned for this project (Central India / East Asia):
 > of the `--name` used to create the resource; add a custom domain (e.g.
 > `www.cutcult.in`) via the Azure Portal → Static Web App → Custom domains
 > once you have one to point at it.
+
+## Known Issues (read this first)
+
+**`nitro@3.0.260603-beta`'s `azure-swa` preset had two real bugs** that made
+every SSR request on Azure SWA fail — this cost most of the deployment
+effort and is worth understanding before touching the frontend build again.
+
+1. `node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs` built
+   `new Request(url, ...)` where `url` was always a bare path (`/`, `/shop`).
+   The Fetch API's `Request` constructor requires an absolute URL when given
+   no base — this threw `TypeError: Failed to parse URL from ...` on
+   **every single invocation**, which Azure's Functions host silently
+   converted into an opaque, empty-body 500 with no application-level error
+   surfaced anywhere (not in App Service logs, not in the browser — nothing).
+2. After fixing that, requests returned 200 but the body was always the
+   literal string `"{}"`. The same handler assigned the raw fetch
+   `Response`'s `ReadableStream` directly to `context.res.body`, which
+   Azure Functions' Node.js v3 binding protocol can't serialize — it
+   JSON-stringifies the stream object.
+
+Both are fixed via `patch-package` (`patches/nitro+3.0.260603-beta.patch`),
+applied automatically by the `postinstall` script on every `npm install`/
+`npm ci`. **If you bump the `nitro` version, verify SSR still works before
+trusting a green deploy** — the patch is pinned to this exact version string
+and won't silently reapply to an unrelated newer version incorrectly, but it
+also means upgrading `nitro` needs the fix re-verified (or re-authored) by
+hand. Verify with the real Azure Functions Core Tools locally, not a plain
+`node` invocation of the bundle (see the diagnostic steps in the patch
+file's commit history if this regresses):
+
+```bash
+brew install azure/functions/azure-functions-core-tools@4
+npm run build:azure   # with VITE_API_URL set
+cd .output/server
+cat > local.settings.json <<'EOF'
+{ "IsEncrypted": false, "Values": { "FUNCTIONS_WORKER_RUNTIME": "node", "AzureWebJobsStorage": "" } }
+EOF
+func start --port 7071
+# in another shell:
+curl -H "x-ms-original-url: https://example.com/" http://localhost:7071/api/server
+```
+
+A working response is full rendered HTML, not `{}` and not a 500.
+
+**Static Web Apps Free tier's tooling was unreliable for this app** — `az
+staticwebapp functions show` refused to even run on Free tier ("must have
+Standard SKU"), and separately, the standalone `@azure/static-web-apps-cli
+deploy` command never got the Managed Functions API to register at all
+(regardless of tier), while the official `Azure/static-web-apps-deploy@v1`
+GitHub Action worked correctly on the first properly-configured attempt.
+**Deploy through the GitHub Action, not the local CLI**, if you ever need
+to debug this again.
 
 ---
 
@@ -156,6 +208,14 @@ If it 503s, check `az webapp log tail --resource-group cutcult-rg --name cutcult
 
 ### Frontend
 
+**Prefer triggering `deploy-frontend.yml` via `gh workflow run deploy-frontend.yml`
+or a push, over deploying manually.** The standalone SWA CLI (`swa deploy`,
+shown below for reference) never got the Managed Functions API to register
+in testing — the site served static files but every SSR route 500'd, with
+no error indicating why. The official GitHub Action worked correctly. If
+you must deploy manually, do it from a fresh `workflow_dispatch` run, not
+this CLI path.
+
 Vite bakes `VITE_API_URL` into the client bundle at **build time** — build
 after the backend is live and reachable at its final URL:
 
@@ -163,7 +223,7 @@ after the backend is live and reachable at its final URL:
 VITE_API_URL="https://cutcult-api.azurewebsites.net/api" npm run build:azure
 ```
 
-Deploy with the Static Web Apps CLI. Get the deployment token first:
+Deploy with the Static Web Apps CLI (reference only — see warning above):
 
 ```bash
 SWA_TOKEN=$(az staticwebapp secrets list --name cutcult-web \
@@ -172,7 +232,7 @@ SWA_TOKEN=$(az staticwebapp secrets list --name cutcult-web \
 npx --yes @azure/static-web-apps-cli deploy \
   --app-location .output/public \
   --api-location .output/server \
-  --api-language node --api-version 20 \
+  --api-language node --api-version 22 \
   --deployment-token "$SWA_TOKEN" \
   --env production
 ```
@@ -226,12 +286,15 @@ Three workflows live in `.github/workflows/`:
 - **`ci.yml`** — every push/PR: Django system check + migration-drift check
   against a throwaway Postgres service container, plus frontend typecheck
   and a build sanity-check. No deployment.
-- **`deploy-backend.yml`** — push to `main` touching `backend/**`: zip-deploys
-  to `cutcult-api` via `azure/webapps-deploy@v3`, then curls `/health/`.
-- **`deploy-frontend.yml`** — push to `main` touching frontend files: builds
-  with `NITRO_PRESET=azure-swa` and deploys via `Azure/static-web-apps-deploy@v1`.
-  Also wires PR preview environments (deploy on PR open/sync, tear down on
-  PR close) — a bonus of the official action, not extra config.
+- **`deploy-backend.yml`** — push to `main` touching `backend/**`: logs in via
+  `azure/login` (service principal, `AZURE_CREDENTIALS` secret), zip-deploys
+  to `cutcult-api` via `az webapp deploy`, then curls `/health/`. (Not
+  `azure/webapps-deploy@v3` with a publish profile — see Known Issues.)
+- **`deploy-frontend.yml`** — push to `main` touching frontend files (now
+  including `patches/**`): builds with `NITRO_PRESET=azure-swa` and deploys
+  via `Azure/static-web-apps-deploy@v1`. Also wires PR preview environments
+  (deploy on PR open/sync, tear down on PR close) — a bonus of the official
+  action, not extra config.
 
 ### Required repo secrets
 
@@ -239,11 +302,19 @@ Three workflows live in `.github/workflows/`:
 
 | Secret | Where it comes from |
 |---|---|
-| `AZURE_WEBAPP_PUBLISH_PROFILE` | `az webapp deployment list-publishing-profiles --resource-group cutcult-rg --name cutcult-api --xml` |
+| `AZURE_CREDENTIALS` | A single JSON blob: `{"clientId","clientSecret","subscriptionId","tenantId"}` from a service principal scoped to `cutcult-rg`: `az ad sp create-for-rbac --name cutcult-github-actions --role contributor --scopes /subscriptions/<sub>/resourceGroups/cutcult-rg` |
 | `AZURE_STATIC_WEB_APPS_API_TOKEN` | `az staticwebapp secrets list --name cutcult-web --query "properties.apiKey" -o tsv` |
 | `VITE_API_URL` | `https://cutcult-api.azurewebsites.net/api` |
 | `DJANGO_SECRET_KEY` | Same value set on the App Service (used by CI's `check` step only) |
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_HOST` / `POSTGRES_PORT` | Your Postgres server (used by CI's `check` step only — the actual runtime values live in App Service app settings, not here) |
+
+> **Don't use `AZURE_WEBAPP_PUBLISH_PROFILE` + `azure/webapps-deploy@v3`.**
+> It rejected a correctly-formed, freshly-fetched publish profile as
+> "invalid" for this app repeatedly, for reasons that were never fully
+> root-caused (a redaction artifact when the profile passed through an
+> intermediate file was ruled out — the failure persisted even piping it
+> directly). The service-principal + `az webapp deploy` path above is what's
+> actually wired up and confirmed working.
 
 ### Required repo variables
 
@@ -300,8 +371,10 @@ artifact the same way, or `git revert` + push.
 | Backend `/health/` returns 503 "Application Error" | No code deployed / crashed on startup | `az webapp log tail -g cutcult-rg -n cutcult-api` |
 | `/health/` returns `{"status":"error","database":false}` | Bad Postgres credentials, firewall, or `sslmode` mismatch | Check app settings; confirm App Service outbound IPs are allow-listed |
 | Frontend loads shell but data never appears / CORS error in console | `CORS_ALLOWED_ORIGINS` on backend doesn't include the SWA URL | Update the app setting, no redeploy needed (takes effect on restart) |
-| Frontend SSR route 500s | Backend unreachable from the Azure Function, or `VITE_API_URL` was wrong **at build time** | Rebuild — this value is baked in, not runtime-configurable |
+| Frontend SSR route 500s, empty response body, no error anywhere | Backend unreachable from the Azure Function, `VITE_API_URL` wrong **at build time**, or (if you touched `node_modules/nitro`) the `patch-package` patch didn't apply — check `postinstall` ran | Rebuild with the right `VITE_API_URL` (baked in, not runtime-configurable); confirm `grep x-forwarded-host node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs` finds the patch |
+| Frontend SSR route returns 200 but body is literally `{}` | Same patch as above missing/reverted | See Known Issues at the top of this doc |
 | `spawn Unknown system error -86` deploying from a Mac | Apple Silicon, no Rosetta 2 | `softwareupdate --install-rosetta --agree-to-license` |
+| `func: command not found` locally when debugging SSR | Azure Functions Core Tools not installed | `brew tap azure/functions && brew install azure/functions/azure-functions-core-tools@4` (may need `brew trust azure/functions` first) |
 | Django admin login fails with a CSRF error | Missing `CSRF_TRUSTED_ORIGINS` for the domain in the address bar | Add `https://<that-domain>` to the app setting |
 | GitHub Actions deploy succeeds but site is stale | Browser/CDN cache | Hard refresh; SWA's CDN edge cache typically clears within a minute of deploy |
 
