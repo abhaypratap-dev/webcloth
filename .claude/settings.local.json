@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pg_ctl --version)",
+      "Bash(/opt/homebrew/opt/postgresql@16/bin/psql -l)",
+      "Bash(psql -l)"
+    ]
+  }
+}
