@@ -58,8 +58,8 @@ export function Table({ headers, children }: { headers: string[]; children: Reac
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-hairline">
-            {headers.map((h) => (
-              <th key={h} className="text-left px-4 py-3 text-eyebrow font-normal whitespace-nowrap">{h}</th>
+            {headers.map((h, i) => (
+              <th key={i} className="text-left px-4 py-3 text-eyebrow font-normal whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>

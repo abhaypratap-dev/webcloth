@@ -7,6 +7,7 @@ import { getProductBySlug, listRelated, listReviews } from "@/lib/products";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
 import { ProductCard } from "@/components/site/ProductCard";
+import { ProductGallery } from "@/components/site/ProductGallery";
 
 const productQuery = (slug: string) =>
   queryOptions({
@@ -77,26 +78,7 @@ function ProductPage() {
       <div className="grid md:grid-cols-[1.4fr_1fr]">
         {/* Gallery */}
         <div className="border-r border-hairline">
-          <div className="grid gap-1">
-            {p.images.map((img, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 1, delay: i * 0.15 }}
-                className="relative aspect-[4/5] overflow-hidden bg-secondary group"
-              >
-                <img
-                  src={img.url}
-                  alt={img.alt ?? p.title}
-                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.7,0,0.2,1)] group-hover:scale-125"
-                />
-              </motion.div>
-            ))}
-            {p.images.length === 1 && (
-              <div className="relative aspect-[4/5] bg-secondary" />
-            )}
-          </div>
+          <ProductGallery images={p.images} title={p.title} />
         </div>
 
         {/* Sticky panel */}

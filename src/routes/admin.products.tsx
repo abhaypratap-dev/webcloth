@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { resolveAsset } from "@/lib/assets";
 import {
@@ -154,11 +154,26 @@ function ProductEditor({
       : { ...EMPTY, variants: [] as Variant[] },
   );
   const [imageUrl, setImageUrl] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const invalidate = useInvalidate(["products", "inventory", "stats"]);
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  const pendingPreviews = useMemo(
+    () => pendingFiles.map((f) => URL.createObjectURL(f)),
+    [pendingFiles],
+  );
+  useEffect(() => () => pendingPreviews.forEach((url) => URL.revokeObjectURL(url)), [pendingPreviews]);
+
+  async function uploadFiles(productId: number, files: File[]) {
+    if (files.length === 0) return;
+    const body = new FormData();
+    files.forEach((f) => body.append("images", f));
+    await api(`/products/admin/${productId}/images/`, { method: "POST", body });
+  }
 
   async function save() {
     setError(null);
@@ -181,6 +196,7 @@ function ProductEditor({
             body: { external_url: imageUrl, alt: form.title, sort_order: 0 },
           });
         }
+        await uploadFiles(created.id, pendingFiles);
       }
       invalidate();
       onClose();
@@ -197,6 +213,30 @@ function ProductEditor({
     });
     setImageUrl("");
     invalidate();
+  }
+
+  async function onFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0) return;
+    if (product) {
+      setUploading(true);
+      setError(null);
+      try {
+        await uploadFiles(product.id, files);
+        invalidate();
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setUploading(false);
+      }
+    } else {
+      setPendingFiles((prev) => [...prev, ...files]);
+    }
+  }
+
+  function removePendingFile(index: number) {
+    setPendingFiles((files) => files.filter((_, i) => i !== index));
   }
 
   async function removeImage(imageId: number) {
@@ -269,14 +309,41 @@ function ProductEditor({
               ))}
             </div>
           )}
-          <div className="flex gap-2 items-end">
+          {pendingFiles.length > 0 && (
+            <div className="flex flex-wrap gap-3 mb-3">
+              {pendingFiles.map((f, i) => (
+                <div key={i} className="relative group">
+                  <img src={pendingPreviews[i]} alt="" className="h-20 w-16 object-cover border border-hairline opacity-90" />
+                  <button
+                    onClick={() => removePendingFile(i)}
+                    className="absolute -top-2 -right-2 h-5 w-5 bg-ink border border-hairline text-xs opacity-0 group-hover:opacity-100 transition"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <label className="block">
+            <span className="block text-eyebrow mb-1.5 opacity-70">Upload files (multiple allowed)</span>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={uploading}
+              onChange={onFilesSelected}
+              className="block w-full text-sm text-muted-foreground file:mr-3 file:px-3 file:py-1.5 file:text-[11px] file:uppercase file:tracking-[0.2em] file:border file:border-hairline file:bg-transparent file:text-bone/80 hover:file:border-bone/50 file:cursor-pointer disabled:opacity-40"
+            />
+          </label>
+          {uploading && <p className="mt-2 text-xs text-muted-foreground">Uploading…</p>}
+          <div className="flex gap-2 items-end mt-3">
             <div className="flex-1">
-              <Input label="Image URL" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://… or /assets/…" />
+              <Input label="…or paste an image URL" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://… or /assets/…" />
             </div>
             {product && <Btn onClick={addImage} disabled={!imageUrl}>Add</Btn>}
           </div>
-          {!product && imageUrl && (
-            <p className="mt-2 text-xs text-muted-foreground">Image will be attached after the product is created.</p>
+          {!product && (imageUrl || pendingFiles.length > 0) && (
+            <p className="mt-2 text-xs text-muted-foreground">Images will be attached after the product is created.</p>
           )}
         </div>
 
