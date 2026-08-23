@@ -129,7 +129,14 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# BASE_DIR is NOT a durable location on Azure App Service: the Oryx build ships
+# the app as an archive that is extracted into a fresh temp directory on every
+# container start, so anything written next to the code is gone on the next
+# restart (and the app has Always On off, so it recycles whenever it goes idle).
+# `/home` is the persistent Azure Files share and survives restarts and deploys
+# — set DJANGO_MEDIA_ROOT=/home/media there. Blob Storage (below) supersedes
+# this entirely once configured.
+MEDIA_ROOT = Path(env("DJANGO_MEDIA_ROOT") or BASE_DIR / "media")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

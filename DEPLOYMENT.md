@@ -69,6 +69,33 @@ curl -H "x-ms-original-url: https://example.com/" http://localhost:7071/api/serv
 
 A working response is full rendered HTML, not `{}` and not a 500.
 
+**Uploaded media does not survive a restart unless `DJANGO_MEDIA_ROOT`
+points inside `/home`.** With `SCM_DO_BUILD_DURING_DEPLOYMENT=true`, Oryx
+ships the built app as an archive that the container extracts into a *fresh
+temp directory on every start* — so `BASE_DIR` is not a stable path, let
+alone a durable one. `MEDIA_ROOT` defaulted to `BASE_DIR / "media"`, which
+meant every admin upload wrote into that throwaway directory. Since the app
+has **Always On off**, the container recycles whenever the site goes idle,
+and every uploaded product image vanished with it: the DB rows survived and
+the API kept returning correct absolute URLs, while `GET /media/...` returned
+a bare 404 from Django — the file genuinely was not there. Nothing in the
+logs says so, because a missing file is a perfectly ordinary 404.
+
+`/home` is the persistent Azure Files share and is the one writable location
+that outlives both restarts and deploys (zip deploy also syncs
+`/home/site/wwwroot`, so even that is not safe for uploads). Production sets:
+
+```bash
+az webapp config appsettings set -g cutcult-rg -n cutcult-api \
+  --settings DJANGO_MEDIA_ROOT=/home/media
+```
+
+This is the stopgap, not the destination — it is single-instance only and
+puts image serving through gunicorn. Provision a Storage Account and set
+`AZURE_STORAGE_ACCOUNT_NAME`/`_KEY` before scaling out or adding a CDN; the
+code switches over with no other change, and `config/urls.py`'s `/media/`
+route stops being used the moment it is set.
+
 **Static Web Apps Free tier's tooling was unreliable for this app** — `az
 staticwebapp functions show` refused to even run on Free tier ("must have
 Standard SKU"), and separately, the standalone `@azure/static-web-apps-cli
@@ -270,12 +297,12 @@ See [`backend/.env.example`](backend/.env.example) for the full annotated
 list (DB, JWT, CORS, email, payments, media storage). Frontend needs only
 `VITE_API_URL`, set at **build time** (see `.env` at repo root for local dev).
 
-Optional production media storage (Azure App Service's local disk doesn't
-persist across deploys/restarts):
+Media storage (see Known Issues — uploaded images 404 without this):
 
 | Variable | Purpose |
 |---|---|
-| `AZURE_STORAGE_ACCOUNT_NAME` | Enables Azure Blob Storage for uploaded media when set; falls back to local disk when empty |
+| `DJANGO_MEDIA_ROOT` | Where uploaded files land on disk. **Must be `/home/media` on App Service** — anywhere else is wiped on restart. Unset locally (`backend/media`) |
+| `AZURE_STORAGE_ACCOUNT_NAME` | Enables Azure Blob Storage for uploaded media when set; falls back to the local disk path above when empty |
 | `AZURE_STORAGE_ACCOUNT_KEY` | |
 | `AZURE_STORAGE_CONTAINER` | Defaults to `media` |
 
@@ -375,6 +402,7 @@ artifact the same way, or `git revert` + push.
 | Frontend SSR route returns 200 but body is literally `{}` | Same patch as above missing/reverted | See Known Issues at the top of this doc |
 | `spawn Unknown system error -86` deploying from a Mac | Apple Silicon, no Rosetta 2 | `softwareupdate --install-rosetta --agree-to-license` |
 | `func: command not found` locally when debugging SSR | Azure Functions Core Tools not installed | `brew tap azure/functions && brew install azure/functions/azure-functions-core-tools@4` (may need `brew trust azure/functions` first) |
+| Uploaded product images 404 (API returns the right URL, Django answers 404) | `DJANGO_MEDIA_ROOT` not set to `/home/media`, so uploads went to the ephemeral extraction dir and were lost on the next restart | Set the app setting; re-upload the images, since the originals are gone. See Known Issues |
 | Django admin login fails with a CSRF error | Missing `CSRF_TRUSTED_ORIGINS` for the domain in the address bar | Add `https://<that-domain>` to the app setting |
 | GitHub Actions deploy succeeds but site is stale | Browser/CDN cache | Hard refresh; SWA's CDN edge cache typically clears within a minute of deploy |
 
