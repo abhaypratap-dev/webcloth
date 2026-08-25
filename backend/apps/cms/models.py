@@ -1,7 +1,7 @@
 from django.db import models
-from django.utils.text import slugify
 
 from apps.common.models import TimeStampedModel
+from apps.common.text import unique_slugify
 
 
 class Page(TimeStampedModel):
@@ -22,7 +22,7 @@ class Page(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.title)
+            self.slug = unique_slugify(self, self.title, fallback="page")
         super().save(*args, **kwargs)
 
 

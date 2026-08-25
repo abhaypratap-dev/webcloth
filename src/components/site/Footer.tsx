@@ -31,7 +31,7 @@ export function Footer() {
       <div className="mx-auto max-w-[100rem] px-5 md:px-10 pt-24 pb-10">
         <div className="grid gap-16 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
-            <SkullMark className="h-16 w-20 text-bone mb-6" />
+            <SkullMark className="h-14 mb-6" />
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
               We don&rsquo;t follow trends. We build classics. Cut &amp; Cult is a unisex
               fashion house built on clean cuts, timeless design, and a culture

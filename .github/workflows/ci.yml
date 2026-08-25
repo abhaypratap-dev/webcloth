@@ -58,6 +58,18 @@ jobs:
         working-directory: backend
         run: python manage.py migrate --noinput
 
+      - name: Tests
+        working-directory: backend
+        run: python manage.py test --noinput
+        env:
+          # The suite asserts on real status codes, so it must run against the
+          # production settings branch (DEBUG=False) rather than the dev one.
+          # SSL redirect off, or every request 301s before reaching a view.
+          DJANGO_DEBUG: "False"
+          DJANGO_SECURE_SSL_REDIRECT: "False"
+          DJANGO_ALLOWED_HOSTS: testserver,localhost
+          DJANGO_LOG_LEVEL: CRITICAL
+
   frontend:
     name: Frontend checks
     runs-on: ubuntu-latest

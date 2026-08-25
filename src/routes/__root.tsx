@@ -17,6 +17,13 @@ import { Nav } from "@/components/site/Nav";
 import { Footer } from "@/components/site/Footer";
 import { CartDrawer } from "@/components/site/CartDrawer";
 
+// og:image/twitter:image must be absolute — crawlers do not resolve site-relative
+// paths — so the public origin has to be baked in at build time like VITE_API_URL.
+const SITE_URL = (
+  (import.meta.env.VITE_SITE_URL as string | undefined) ||
+  "https://lemon-tree-079d4be00.7.azurestaticapps.net"
+).replace(/\/+$/, "");
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-ink px-4">
@@ -65,13 +72,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "Cut & Cult — Building a culture. One cut at a time." },
       { property: "og:description", content: "Cut & Cult is a unisex fashion house. Timeless silhouettes, heavyweight fabrics, and a culture built on authenticity." },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: `${SITE_URL}/og-image.png` },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:url", content: SITE_URL },
+      { property: "og:site_name", content: "Cut & Cult" },
+      // summary_large_image without an image renders as a bare text card.
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: `${SITE_URL}/og-image.png` },
       { name: "twitter:title", content: "Cut & Cult — Building a culture. One cut at a time." },
       { name: "twitter:description", content: "Cut & Cult is a unisex fashion house. Timeless silhouettes, heavyweight fabrics, and a culture built on authenticity." },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,

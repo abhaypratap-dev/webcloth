@@ -144,7 +144,19 @@ class AdminProductSerializer(serializers.ModelSerializer):
             "images", "variants", "total_stock", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
-        extra_kwargs = {"slug": {"required": False}}
+        extra_kwargs = {"slug": {"required": False, "allow_blank": True}}
+
+    def validate(self, attrs):
+        # Product.save() quietly drops an offer_price that isn't below price,
+        # which from the dashboard looks like the field silently refusing to
+        # save. Reject it here so the admin is told why.
+        price = attrs.get("price", getattr(self.instance, "price", None))
+        offer_price = attrs.get("offer_price", getattr(self.instance, "offer_price", None))
+        if price is not None and offer_price is not None and offer_price >= price:
+            raise serializers.ValidationError(
+                {"offer_price": "Offer price must be lower than the price."}
+            )
+        return attrs
 
     def create(self, validated_data):
         variants = validated_data.pop("variants", [])

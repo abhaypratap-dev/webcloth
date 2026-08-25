@@ -73,7 +73,7 @@ function Auth() {
     <div className="min-h-screen grid place-items-center px-5 pt-24 pb-16">
       <div className="w-full max-w-sm">
         <div className="text-center mb-12">
-          <SkullMark className="mx-auto h-10 w-14 text-bone mb-6" />
+          <SkullMark className="mx-auto h-10 mb-6" />
           <p className="text-eyebrow">{heading.eyebrow}</p>
           <h1 className="mt-4 text-large-display text-[2rem]">{heading.title}</h1>
         </div>

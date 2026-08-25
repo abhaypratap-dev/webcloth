@@ -1,19 +1,36 @@
+/**
+ * Brand marks. Both render the supplied artwork (white-on-transparent PNGs
+ * generated from the master logo), so they need a dark surface behind them —
+ * every surface in this app is `--ink`.
+ *
+ * Sizing convention: callers set a height (`h-*`) and leave the width to
+ * `w-auto`; the artwork is ~2.7:1 (lockup) and ~2:1 (mark), and pinning both
+ * axes distorts it.
+ */
+
 export function Logo({ className = "" }: { className?: string }) {
   return (
-    <span className={`font-display font-bold tracking-[0.08em] text-[1rem] md:text-[1.05rem] ${className}`}>
-      CUT<span className="mx-1 opacity-60">&amp;</span>CULT
-    </span>
+    <img
+      src="/logo.png"
+      alt="Cut &amp; Cult"
+      width={900}
+      height={334}
+      draggable={false}
+      className={`block w-auto h-8 md:h-9 select-none ${className}`}
+    />
   );
 }
 
 export function SkullMark({ className = "" }: { className?: string }) {
-  // Simple stylized skull mark — brand watermark
   return (
-    <svg viewBox="0 0 64 48" className={className} aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M18 4c-6 3-10 9-10 17 0 5 2 9 5 12v6c0 2 1 3 3 3h4v-4h4v4h8v-4h4v4h4c2 0 3-1 3-3v-6c3-3 5-7 5-12 0-8-4-14-10-17-4-2-11-2-15 0zm2 15a3 3 0 110 6 3 3 0 010-6zm18 0a3 3 0 110 6 3 3 0 010-6zM26 30h8l-2 4h-4l-2-4z"
-      />
-    </svg>
+    <img
+      src="/logo-mark.png"
+      alt=""
+      aria-hidden="true"
+      width={320}
+      height={163}
+      draggable={false}
+      className={`block w-auto select-none ${className}`}
+    />
   );
 }

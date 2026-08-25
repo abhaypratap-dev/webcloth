@@ -1,7 +1,7 @@
 from django.db import models
-from django.utils.text import slugify
 
 from apps.common.models import TimeStampedModel
+from apps.common.text import unique_slugify
 
 
 class Category(TimeStampedModel):
@@ -24,5 +24,5 @@ class Category(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.name)
+            self.slug = unique_slugify(self, self.name, fallback="category")
         super().save(*args, **kwargs)

@@ -3,11 +3,11 @@ from decimal import Decimal
 from django.contrib.postgres.fields import ArrayField
 from django.core.validators import MinValueValidator
 from django.db import models
-from django.utils.text import slugify
 
 from apps.brands.models import Brand
 from apps.categories.models import Category
 from apps.common.models import TimeStampedModel
+from apps.common.text import unique_slugify
 
 
 class ProductQuerySet(models.QuerySet):
@@ -70,7 +70,12 @@ class Product(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.title)
+            self.slug = unique_slugify(self, self.title, fallback="product")
+        # `sku` is unique but optional. An empty string is a *value* as far as
+        # Postgres is concerned, so a second SKU-less product would collide on
+        # ""; NULLs do not collide with each other, so store the absence as one.
+        if not self.sku:
+            self.sku = None
         if self.offer_price is not None and self.offer_price >= self.price:
             self.offer_price = None
         super().save(*args, **kwargs)

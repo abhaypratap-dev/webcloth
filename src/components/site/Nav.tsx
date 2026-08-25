@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ShoppingBag, Search, User, Menu, X } from "lucide-react";
-import { Logo, SkullMark } from "./Logo";
+import { Logo } from "./Logo";
 import { useCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 
@@ -57,7 +57,6 @@ export function Nav() {
           </div>
 
           <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
-            <SkullMark className="h-5 w-6 text-bone" />
             <Logo />
           </Link>
 

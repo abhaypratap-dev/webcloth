@@ -151,7 +151,7 @@ function Marquee() {
         {[...line, ...line].map((w, i) => (
           <span key={i} className="mx-8 inline-flex items-center gap-8 text-large-display text-[2rem] md:text-[3rem] opacity-90">
             {w}
-            <SkullMark className="h-6 w-8 text-bone/70" />
+            <SkullMark className="h-6 opacity-70" />
           </span>
         ))}
       </div>
@@ -347,7 +347,7 @@ function Newsletter() {
   return (
     <section className="border-t border-hairline px-5 md:px-10 py-24 md:py-32">
       <div className="mx-auto max-w-3xl text-center">
-        <SkullMark className="mx-auto h-10 w-14 text-bone opacity-80 mb-8" />
+        <SkullMark className="mx-auto h-10 opacity-80 mb-8" />
         <p className="text-eyebrow">Members only</p>
         <h2 className="mt-6 text-large-display text-[2.5rem] md:text-[4rem]">Join the Cult</h2>
         <p className="mt-6 text-muted-foreground max-w-md mx-auto">

@@ -19,7 +19,7 @@ function About() {
   return (
     <div>
       <section className="pt-40 pb-24 px-5 md:px-10 text-center max-w-4xl mx-auto">
-        <SkullMark className="mx-auto h-12 w-16 text-bone mb-8" />
+        <SkullMark className="mx-auto h-12 mb-8" />
         <p className="text-eyebrow">The House</p>
         <h1 className="mt-6 text-massive text-[3.5rem] md:text-[7rem]">Cut &amp; Cult</h1>
         <p className="mt-8 text-lg text-muted-foreground max-w-xl mx-auto">

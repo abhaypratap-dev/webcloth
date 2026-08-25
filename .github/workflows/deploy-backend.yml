@@ -18,6 +18,22 @@ jobs:
     environment:
       name: production
       url: https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net
+    services:
+      # Throwaway database for the test run below. The test runner creates and
+      # drops a `test_*` database, which must never happen on the production
+      # server the `check` step's credentials point at.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: cutcult
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -43,6 +59,25 @@ jobs:
           POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
           POSTGRES_SSLMODE: require
+
+      # A red test run must stop the deploy, so this sits ahead of packaging.
+      # CI runs the same suite, but CI and deploy race each other on a push to
+      # main — a CI failure alone would not hold this workflow back.
+      - name: Tests
+        working-directory: backend
+        run: python manage.py test --noinput
+        env:
+          DJANGO_SECRET_KEY: ci-only-not-for-production
+          DJANGO_DEBUG: "False"
+          DJANGO_SECURE_SSL_REDIRECT: "False"
+          DJANGO_ALLOWED_HOSTS: testserver,localhost
+          DJANGO_LOG_LEVEL: CRITICAL
+          POSTGRES_DB: cutcult
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: "5432"
+          POSTGRES_SSLMODE: prefer
 
       - name: Package backend
         working-directory: backend
