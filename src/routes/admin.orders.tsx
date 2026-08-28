@@ -16,6 +16,15 @@ type AdminOrder = Order & { customer_email: string; customer_name: string };
 
 const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => ({ value, label }));
 
+// "awaiting" means a UPI/bank customer says they paid and it needs confirming
+// on the Payments screen — it should stand out, not read as ordinary pending.
+const PAYMENT_TONE: Record<string, "good" | "bad" | "warn" | "default"> = {
+  paid: "good",
+  awaiting: "warn",
+  failed: "bad",
+  refunded: "bad",
+};
+
 const STATUS_TONE: Record<string, "good" | "bad" | "warn" | "default"> = {
   delivered: "good",
   cancelled: "bad",
@@ -70,7 +79,7 @@ function AdminOrders() {
               <Td>{o.items.length}</Td>
               <Td>{money(o.total)}</Td>
               <Td>
-                <Chip tone={o.payment_status === "paid" ? "good" : "default"}>
+                <Chip tone={PAYMENT_TONE[o.payment_status] ?? "default"}>
                   {o.payment_method.toUpperCase()} · {o.payment_status}
                 </Chip>
               </Td>

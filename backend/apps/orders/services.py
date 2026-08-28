@@ -65,8 +65,20 @@ def place_order(user, shipping_address, billing_address=None, payment_method=Ord
         elif line.product.total_stock < line.quantity:
             raise OrderError(f"'{line.product.title}' is out of stock.")
 
+    # UPI/bank transfers are settled outside the site: the order is real and
+    # its stock is reserved, but it stays unpaid until an admin confirms the
+    # money arrived (apps.payments.services.approve).
+    from apps.payments.models import PaymentMethodConfig
+
+    payment_status = (
+        Order.PaymentStatus.AWAITING
+        if payment_method in PaymentMethodConfig.MANUAL_METHODS
+        else Order.PaymentStatus.PENDING
+    )
+
     order = Order.objects.create(
         user=user,
+        payment_status=payment_status,
         subtotal=totals.subtotal,
         discount=totals.discount,
         shipping=totals.shipping,

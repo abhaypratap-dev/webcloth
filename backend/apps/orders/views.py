@@ -36,7 +36,7 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return (
             Order.objects.filter(user=self.request.user)
-            .prefetch_related("items", "events")
+            .prefetch_related("items", "events", "payments")
         )
 
     @action(detail=False, methods=["post"])
@@ -80,7 +80,7 @@ class AdminOrderViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ["created_at", "total"]
 
     def get_queryset(self):
-        return Order.objects.select_related("user").prefetch_related("items", "events")
+        return Order.objects.select_related("user").prefetch_related("items", "events", "payments")
 
     @action(detail=True, methods=["patch"])
     def set_status(self, request, pk=None):

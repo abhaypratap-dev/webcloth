@@ -32,6 +32,7 @@ class OrderSerializer(serializers.ModelSerializer):
     tax = serializers.FloatField(read_only=True)
     total = serializers.FloatField(read_only=True)
     can_cancel = serializers.SerializerMethodField()
+    manual_payment = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -39,11 +40,36 @@ class OrderSerializer(serializers.ModelSerializer):
             "id", "order_number", "status", "subtotal", "discount", "shipping",
             "tax", "total", "coupon_code", "payment_method", "payment_status",
             "shipping_address", "billing_address", "notes", "tracking_number",
-            "items", "events", "can_cancel", "created_at",
+            "items", "events", "can_cancel", "manual_payment", "created_at",
         ]
 
     def get_can_cancel(self, obj):
         return obj.status in Order.CANCELLABLE
+
+    def get_manual_payment(self, obj):
+        """Everything the orders screen needs to finish a UPI/bank payment.
+
+        None for methods that settle themselves, so the customer only ever
+        sees pay-to details on orders that actually need them.
+        """
+        from apps.payments.models import PaymentMethodConfig
+
+        if obj.payment_method not in PaymentMethodConfig.MANUAL_METHODS:
+            return None
+        config = PaymentMethodConfig.objects.filter(method=obj.payment_method).first()
+        # `.all()` rather than `.first()` so the viewset's prefetch is used.
+        payments = sorted(obj.payments.all(), key=lambda p: p.created_at, reverse=True)
+        payment = payments[0] if payments else None
+        request = self.context.get("request")
+        return {
+            "payment_id": payment.id if payment else None,
+            "status": payment.status if payment else "",
+            "reference": payment.reference if payment else "",
+            "review_note": payment.review_note if payment else "",
+            "label": config.label if config else obj.get_payment_method_display(),
+            "instructions": config.instructions if config else "",
+            "pay_to": config.pay_to_details(request) if config else {},
+        }
 
 
 class AdminOrderSerializer(OrderSerializer):
@@ -61,6 +87,16 @@ class CheckoutSerializer(serializers.Serializer):
         choices=Order.PaymentMethod.choices, default=Order.PaymentMethod.COD
     )
     notes = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+
+    def validate_payment_method(self, value):
+        # The storefront only lists enabled methods, but the field is a plain
+        # string on the wire — without this, a disabled (or unconfigured)
+        # gateway could still be selected by hand.
+        from apps.payments.models import PaymentMethodConfig
+
+        if value not in PaymentMethodConfig.enabled_methods():
+            raise serializers.ValidationError("That payment method is not available right now.")
+        return value
 
     def validate(self, attrs):
         user = self.context["request"].user

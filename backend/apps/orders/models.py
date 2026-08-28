@@ -26,11 +26,16 @@ class Order(TimeStampedModel):
 
     class PaymentMethod(models.TextChoices):
         COD = "cod", "Cash on Delivery"
+        UPI = "upi", "UPI"
+        BANK = "bank", "Bank Transfer"
         RAZORPAY = "razorpay", "Razorpay"
         STRIPE = "stripe", "Stripe"
 
     class PaymentStatus(models.TextChoices):
         PENDING = "pending", "Pending"
+        # UPI/bank transfers are paid outside the site: the customer has said
+        # they sent the money and an admin has not yet confirmed it arrived.
+        AWAITING = "awaiting", "Awaiting confirmation"
         PAID = "paid", "Paid"
         FAILED = "failed", "Failed"
         REFUNDED = "refunded", "Refunded"
@@ -51,9 +56,9 @@ class Order(TimeStampedModel):
     coupon = models.ForeignKey(Coupon, null=True, blank=True, on_delete=models.SET_NULL)
     coupon_code = models.CharField(max_length=40, blank=True)
 
-    payment_method = models.CharField(max_length=10, choices=PaymentMethod.choices, default=PaymentMethod.COD)
+    payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.COD)
     payment_status = models.CharField(
-        max_length=10, choices=PaymentStatus.choices, default=PaymentStatus.PENDING, db_index=True
+        max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.PENDING, db_index=True
     )
 
     # Address snapshots — orders must survive address edits/deletes.

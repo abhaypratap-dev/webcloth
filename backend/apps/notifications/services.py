@@ -61,6 +61,33 @@ def order_placed(order):
     )
 
 
+def payment_approved(order):
+    _notify(
+        order.user,
+        Notification.Kind.PAYMENT_UPDATE,
+        f"Payment confirmed for order {order.order_number}",
+        f"Hi {order.user.full_name},\n\nWe've confirmed your "
+        f"{order.get_payment_method_display()} payment for order "
+        f"{order.order_number}. It's now being prepared.",
+        f"{settings.FRONTEND_URL}/account/orders",
+    )
+
+
+def payment_rejected(order, reason: str = ""):
+    _notify(
+        order.user,
+        Notification.Kind.PAYMENT_UPDATE,
+        f"Payment could not be confirmed for order {order.order_number}",
+        f"Hi {order.user.full_name},\n\nWe couldn't confirm your payment for "
+        f"order {order.order_number}, so it has been cancelled and any reserved "
+        f"stock released."
+        + (f"\n\nReason: {reason}" if reason else "")
+        + "\n\nIf you believe this is a mistake, reply to this email with your "
+        "payment reference and we'll take another look.",
+        f"{settings.FRONTEND_URL}/account/orders",
+    )
+
+
 def order_status_changed(order):
     kind = Notification.Kind.SHIPPING_UPDATE
     if order.status in ("delivered", "out_for_delivery"):

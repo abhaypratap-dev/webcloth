@@ -9,6 +9,7 @@ class Notification(models.Model):
         ORDER_CONFIRMATION = "order_confirmation", "Order Confirmation"
         SHIPPING_UPDATE = "shipping_update", "Shipping Update"
         DELIVERY_UPDATE = "delivery_update", "Delivery Update"
+        PAYMENT_UPDATE = "payment_update", "Payment Update"
         PASSWORD_RESET = "password_reset", "Password Reset"
         PROMO = "promo", "Promotional"
 

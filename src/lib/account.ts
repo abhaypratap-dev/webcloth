@@ -50,7 +50,36 @@ export type Order = {
   items: OrderItem[];
   events: OrderEvent[];
   can_cancel: boolean;
+  /** Present only on UPI / bank-transfer orders, which settle out-of-band. */
+  manual_payment: ManualPayment | null;
   created_at: string;
+};
+
+export type ManualPayment = {
+  payment_id: number | null;
+  /** "" | "pending" | "submitted" | "succeeded" | "failed" */
+  status: string;
+  reference: string;
+  review_note: string;
+  label: string;
+  instructions: string;
+  pay_to: {
+    upi_id?: string;
+    upi_qr?: string;
+    account_name?: string;
+    account_number?: string;
+    ifsc?: string;
+    bank_name?: string;
+    branch?: string;
+  };
+};
+
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: "Payment pending",
+  awaiting: "Awaiting confirmation",
+  paid: "Paid",
+  failed: "Payment failed",
+  refunded: "Refunded",
 };
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {

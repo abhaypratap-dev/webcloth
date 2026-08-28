@@ -3,6 +3,11 @@
 Each gateway implements `create(order)` → client payload the frontend needs to
 collect payment, and `verify(payment, data)` → bool (payment captured).
 Register new gateways by adding a class to GATEWAYS.
+
+Manual gateways (UPI, bank transfer) are the exception: money moves outside
+the site, so nothing can be verified programmatically. They hand the customer
+the merchant's pay-to details and never self-verify — an admin approves them
+through `apps.payments.services`.
 """
 
 import base64
@@ -29,7 +34,7 @@ class GatewayError(Exception):
 class BaseGateway:
     name = "base"
 
-    def create(self, order: Order) -> Payment:
+    def create(self, order: Order, request=None) -> Payment:
         raise NotImplementedError
 
     def verify(self, payment: Payment, data: dict) -> bool:
@@ -52,12 +57,55 @@ class CodGateway(BaseGateway):
 
     name = "cod"
 
-    def create(self, order: Order) -> Payment:
+    def create(self, order: Order, request=None) -> Payment:
         return self._new_payment(order, status=Payment.Status.PENDING)
 
     def verify(self, payment: Payment, data: dict) -> bool:
         # COD is settled on delivery (orders.services marks it paid then).
         return True
+
+
+class ManualGateway(BaseGateway):
+    """Base for methods settled by hand outside the site (UPI, bank transfer).
+
+    `create` returns the merchant's pay-to details as the client payload so
+    the checkout screen can show where to send the money. `verify` always
+    returns False: there is nothing to check against, and letting the customer
+    self-verify would mark unpaid orders as paid. Confirmation goes through
+    `services.approve` / `services.reject` instead.
+    """
+
+    def config(self):
+        from .models import PaymentMethodConfig
+
+        config = PaymentMethodConfig.objects.filter(method=self.name).first()
+        if config is None or not config.is_enabled:
+            raise GatewayError(f"{self.name.upper()} is not available right now.")
+        return config
+
+    def create(self, order: Order, request=None) -> Payment:
+        config = self.config()
+        return self._new_payment(
+            order,
+            status=Payment.Status.PENDING,
+            client_payload={
+                "kind": "manual",
+                "label": config.label,
+                "instructions": config.instructions,
+                "pay_to": config.pay_to_details(request),
+            },
+        )
+
+    def verify(self, payment: Payment, data: dict) -> bool:
+        return False
+
+
+class UpiGateway(ManualGateway):
+    name = "upi"
+
+
+class BankTransferGateway(ManualGateway):
+    name = "bank"
 
 
 class RazorpayGateway(BaseGateway):
@@ -70,7 +118,7 @@ class RazorpayGateway(BaseGateway):
         raw = f"{settings.RAZORPAY_KEY_ID}:{settings.RAZORPAY_KEY_SECRET}".encode()
         return "Basic " + base64.b64encode(raw).decode()
 
-    def create(self, order: Order) -> Payment:
+    def create(self, order: Order, request=None) -> Payment:
         body = json.dumps(
             {
                 "amount": int(order.total * 100),  # smallest currency unit
@@ -131,7 +179,7 @@ class StripeGateway(BaseGateway):
             logger.error("Stripe request failed: %s", exc)
             raise GatewayError("Could not reach Stripe. Try again.") from exc
 
-    def create(self, order: Order) -> Payment:
+    def create(self, order: Order, request=None) -> Payment:
         intent = self._request(
             "/payment_intents",
             {
@@ -158,7 +206,8 @@ class StripeGateway(BaseGateway):
 
 
 GATEWAYS: dict[str, BaseGateway] = {
-    g.name: g() for g in (CodGateway, RazorpayGateway, StripeGateway)
+    g.name: g()
+    for g in (CodGateway, UpiGateway, BankTransferGateway, RazorpayGateway, StripeGateway)
 }
 
 
