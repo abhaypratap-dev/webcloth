@@ -2,6 +2,10 @@
 __pycache__/
 *.pyc
 .env
+# Backups/variants too — these hold the same secrets as .env and an
+# `git add -A` would otherwise sweep them in.
+.env.*
+!.env.example
 media/
 staticfiles/
 *.log
