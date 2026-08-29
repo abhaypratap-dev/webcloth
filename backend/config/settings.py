@@ -226,7 +226,13 @@ EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Cut & Cult <no-reply@cutcult.local>")
 
 # Frontend origin used in password-reset links and notification emails.
-FRONTEND_URL = env("FRONTEND_URL", "http://localhost:8080")
+#
+# Exactly one origin, unlike CORS_ALLOWED_ORIGINS right above. Production had
+# been set to a comma-separated pair by analogy with that setting, which turned
+# every reset link into "https://a, https://b/reset-password?..." — unusable,
+# and invisible until someone tries to reset a password. Take the first entry
+# and normalise the trailing slash rather than let that recur.
+FRONTEND_URL = env("FRONTEND_URL", "http://localhost:8080").split(",")[0].strip().rstrip("/")
 
 # ---------------------------------------------------------------------------
 # Payments

@@ -179,3 +179,42 @@ class OrderAndPaymentEmailTests(TestCase):
         self.place("upi")
         customer_mail = [m for m in mail.outbox if "shopper@cutcult.test" in m.to][0]
         self.assertIn("submit your reference", customer_mail.body)
+
+
+class FrontendUrlTests(TestCase):
+    """Links in email are only as good as the origin they are built from."""
+
+    def test_a_comma_separated_value_yields_one_usable_origin(self):
+        from importlib import reload
+
+        import config.settings as django_settings
+
+        with self.settings():
+            import os
+
+            os.environ["FRONTEND_URL"] = (
+                "https://lemon-tree-079d4be00.7.azurestaticapps.net, https://www.cutandcult.in"
+            )
+            try:
+                reload(django_settings)
+                self.assertEqual(
+                    django_settings.FRONTEND_URL,
+                    "https://lemon-tree-079d4be00.7.azurestaticapps.net",
+                )
+            finally:
+                os.environ.pop("FRONTEND_URL", None)
+                reload(django_settings)
+
+    def test_trailing_slash_is_normalised(self):
+        from importlib import reload
+        import os
+
+        import config.settings as django_settings
+
+        os.environ["FRONTEND_URL"] = "https://www.cutandcult.in/"
+        try:
+            reload(django_settings)
+            self.assertEqual(django_settings.FRONTEND_URL, "https://www.cutandcult.in")
+        finally:
+            os.environ.pop("FRONTEND_URL", None)
+            reload(django_settings)
