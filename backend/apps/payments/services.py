@@ -49,6 +49,7 @@ def submit_for_review(payment: Payment, reference: str, proof=None) -> Payment:
         "Payment %s for order %s submitted for review (ref %s)",
         payment.pk, order.order_number, reference,
     )
+    notify.admin_manual_payment_submitted(payment)
     return payment
 
 
@@ -101,8 +102,11 @@ def reject(payment: Payment, user=None, note: str = "") -> Payment:
 
     if order.status != Order.Status.CANCELLED:
         # cancel() restocks and logs its own status event.
+        # notify_customer=False: payment_rejected below says the same thing with
+        # the reason attached, and two emails about one event is noise.
         order_services.cancel(
             order, user=user, note=note or "Payment could not be confirmed",
+            notify_customer=False,
         )
     order.refresh_from_db()
     if order.payment_status != Order.PaymentStatus.FAILED:

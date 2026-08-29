@@ -1,0 +1,63 @@
+{% comment %}
+Wrapper for every transactional email. Table layout with inline styles — email
+clients strip <style> blocks and ignore flex/grid. Deliberately light-on-dark
+only in the header band: a fully dark email renders unpredictably across
+clients, and several force their own background behind transparent PNGs.
+{% endcomment %}<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f3f1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#111111;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f3f1;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e2dd;">
+
+            <tr>
+              <td align="center" style="background:#111111;padding:28px 24px;">
+                <img src="{{ frontend_url }}/logo.png" alt="{{ store_name }}"
+                     width="150" style="display:block;width:150px;max-width:60%;height:auto;border:0;" />
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:36px 32px 8px;">
+                <h1 style="margin:0 0 18px;font-size:20px;line-height:1.3;font-weight:600;color:#111111;">
+                  {{ title }}
+                </h1>
+                <div style="font-size:15px;line-height:1.65;color:#3a3a3a;">
+                  {{ body|linebreaksbr }}
+                </div>
+              </td>
+            </tr>
+
+            {% if link %}
+            <tr>
+              <td style="padding:26px 32px 8px;">
+                <a href="{{ link }}"
+                   style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;
+                          padding:13px 26px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;">
+                  {{ cta_label|default:"View details" }}
+                </a>
+                <p style="margin:14px 0 0;font-size:12px;line-height:1.5;color:#8a8a8a;word-break:break-all;">
+                  Or paste this into your browser:<br />{{ link }}
+                </p>
+              </td>
+            </tr>
+            {% endif %}
+
+            <tr>
+              <td style="padding:32px;">
+                <hr style="border:0;border-top:1px solid #e5e2dd;margin:0 0 18px;" />
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#8a8a8a;">
+                  {{ store_name }}{% if tagline %} — {{ tagline }}{% endif %}<br />
+                  {% if contact_email %}Questions? Reply to this email or write to
+                  <a href="mailto:{{ contact_email }}" style="color:#111111;">{{ contact_email }}</a>.{% endif %}
+                </p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

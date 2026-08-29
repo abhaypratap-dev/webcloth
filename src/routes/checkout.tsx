@@ -126,8 +126,7 @@ function Checkout() {
     }
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit() {
     if (addressId === null) {
       setError("Choose a shipping address first.");
       return;
@@ -170,7 +169,7 @@ function Checkout() {
       <h1 className="mt-4 text-large-display">Details</h1>
 
       <div className="grid md:grid-cols-[1.3fr_1fr] gap-16 mt-12">
-        <form onSubmit={submit} className="space-y-10">
+        <div className="space-y-10">
           <Section title="Shipping address">
             {(addresses?.length ?? 0) > 0 && (
               <div className="space-y-3">
@@ -210,8 +209,10 @@ function Checkout() {
                   is_default: (addresses?.length ?? 0) === 0,
                 }}
                 addressId={null}
-                onDone={() => {
+                onDone={(saved) => {
                   setShowAddressForm(false);
+                  setAddressId(saved.id);
+                  setError(null);
                   queryClient.invalidateQueries({ queryKey: ["addresses"] });
                 }}
                 onCancel={() => setShowAddressForm(false)}
@@ -269,10 +270,15 @@ function Checkout() {
           </Section>
 
           {error && <p className="text-xs text-destructive">{error}</p>}
-          <button disabled={placing || !payment} className="btn-cult w-full">
+          <button
+            type="button"
+            onClick={submit}
+            disabled={placing || !payment}
+            className="btn-cult w-full"
+          >
             {placing ? "Placing order…" : `Place order — ₹${cart.total.toFixed(2)}`}
           </button>
-        </form>
+        </div>
 
         <aside className="border-l border-hairline pl-8 md:pl-12">
           <div className="text-eyebrow mb-6">Order</div>
@@ -420,7 +426,7 @@ function ManualPaymentStep({
   return (
     <div className="pt-32 pb-24 px-5 md:px-10 max-w-2xl mx-auto">
       <p className="text-eyebrow">Order placed — {order.order_number}</p>
-      <h1 className="mt-4 text-large-display">Now pay {order.total.toFixed(2)}</h1>
+      <h1 className="mt-4 text-large-display">Now pay ₹{order.total.toFixed(2)}</h1>
       <p className="mt-4 text-sm text-muted-foreground">
         Your order is reserved but not confirmed yet. Send the exact amount using the
         details below, then tell us the reference so we can match it.
@@ -442,7 +448,7 @@ function ManualPaymentStep({
         {payTo.ifsc && <PayRow label="IFSC" value={payTo.ifsc} />}
         {payTo.bank_name && <PayRow label="Bank" value={payTo.bank_name} />}
         {payTo.branch && <PayRow label="Branch" value={payTo.branch} />}
-        <PayRow label="Amount" value={order.total.toFixed(2)} />
+        <PayRow label="Amount" value={`₹${order.total.toFixed(2)}`} />
 
         {method.instructions && (
           <p className="text-xs text-muted-foreground leading-relaxed border-t border-hairline pt-4">

@@ -99,7 +99,8 @@ export function AddressForm({
 }: {
   initial: AddressInput;
   addressId: number | null;
-  onDone: () => void;
+  /** Receives the saved address so checkout can select a just-added one. */
+  onDone: (address: Address) => void;
   onCancel: () => void;
 }) {
   const [form, setForm] = useState<AddressInput>({ ...initial });
@@ -114,9 +115,9 @@ export function AddressForm({
     setSaving(true);
     setError(null);
     try {
-      if (addressId === null) await createAddress(form);
-      else await updateAddress(addressId, form);
-      onDone();
+      const saved =
+        addressId === null ? await createAddress(form) : await updateAddress(addressId, form);
+      onDone(saved);
     } catch (e: any) {
       setError(e.message);
     } finally {

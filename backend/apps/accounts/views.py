@@ -15,7 +15,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.common.permissions import IsAdmin
-from apps.notifications.services import send_password_reset_email
+from apps.notifications.services import send_password_reset_email, send_welcome_email
 
 from .models import Address
 from .serializers import (
@@ -44,6 +44,8 @@ class RegisterView(generics.CreateAPIView):
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
         logger.info("New user registered: %s", user.email)
+        # Best-effort inside the service; a mail outage must not fail signup.
+        send_welcome_email(user)
         return Response(
             {
                 "user": UserSerializer(user).data,

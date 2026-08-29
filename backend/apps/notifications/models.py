@@ -6,12 +6,15 @@ class Notification(models.Model):
     """In-app notification log; email/SMS/push delivery goes through channels."""
 
     class Kind(models.TextChoices):
+        WELCOME = "welcome", "Welcome"
         ORDER_CONFIRMATION = "order_confirmation", "Order Confirmation"
         SHIPPING_UPDATE = "shipping_update", "Shipping Update"
         DELIVERY_UPDATE = "delivery_update", "Delivery Update"
         PAYMENT_UPDATE = "payment_update", "Payment Update"
         PASSWORD_RESET = "password_reset", "Password Reset"
         PROMO = "promo", "Promotional"
+        # Store-side alerts, addressed to staff rather than customers.
+        ADMIN_ALERT = "admin_alert", "Admin Alert"
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="notifications", on_delete=models.CASCADE)
     kind = models.CharField(max_length=30, choices=Kind.choices)

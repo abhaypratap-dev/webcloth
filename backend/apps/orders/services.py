@@ -117,7 +117,11 @@ def place_order(user, shipping_address, billing_address=None, payment_method=Ord
     cart.save(update_fields=["coupon"])
 
     logger.info("Order %s placed by %s (total %s)", order.order_number, user.email, order.total)
-    transaction.on_commit(lambda: notify.order_placed(order))
+    def _announce():
+        notify.order_placed(order)
+        notify.admin_order_placed(order)
+
+    transaction.on_commit(_announce)
     return order
 
 
@@ -150,7 +154,7 @@ def transition(order: Order, new_status: str, user=None, note: str = "") -> Orde
 
 
 @transaction.atomic
-def cancel(order: Order, user=None, note: str = "") -> Order:
+def cancel(order: Order, user=None, note: str = "", notify_customer: bool = True) -> Order:
     if order.status not in Order.CANCELLABLE:
         raise OrderError("This order has already shipped and can no longer be cancelled.")
     # Restock
@@ -167,5 +171,8 @@ def cancel(order: Order, user=None, note: str = "") -> Order:
     OrderStatusEvent.objects.create(
         order=order, status=Order.Status.CANCELLED, note=note or "Order cancelled", created_by=user
     )
-    transaction.on_commit(lambda: notify.order_status_changed(order))
+    # Callers that send their own, more specific message opt out — a rejected
+    # payment should not also produce a bare "your order is now cancelled".
+    if notify_customer:
+        transaction.on_commit(lambda: notify.order_status_changed(order))
     return order
