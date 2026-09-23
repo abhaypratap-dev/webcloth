@@ -1,5 +1,11 @@
 # Deployment Guide — Cut & Cult
 
+> **This document describes the original single-tenant deployment.** The
+> backend now serves several brands, each with its own database, and there
+> are three frontends rather than one. Read **[PRODUCTION.md](PRODUCTION.md)**
+> first for the platform-level setup; the Azure specifics and the SSR preset
+> bugs documented below still apply to each storefront.
+
 Architecture: Django REST API on **Azure App Service** (Linux, Python), a
 TanStack Start SSR frontend on **Azure Static Web Apps** (static assets +
 a managed Azure Functions app for server rendering), and a user-managed
@@ -294,8 +300,9 @@ python manage.py seed_store   # optional: demo catalogue + admin user
 ## 6. Environment variables reference
 
 See [`backend/.env.example`](backend/.env.example) for the full annotated
-list (DB, JWT, CORS, email, payments, media storage). Frontend needs only
-`VITE_API_URL`, set at **build time** (see `.env` at repo root for local dev).
+list (DB, JWT, CORS, email, payments, shipping, media storage). Frontend needs
+only `VITE_API_URL`, set at **build time** (see `.env` at repo root for local
+dev).
 
 Media storage (see Known Issues — uploaded images 404 without this):
 
@@ -305,6 +312,25 @@ Media storage (see Known Issues — uploaded images 404 without this):
 | `AZURE_STORAGE_ACCOUNT_NAME` | Enables Azure Blob Storage for uploaded media when set; falls back to the local disk path above when empty |
 | `AZURE_STORAGE_ACCOUNT_KEY` | |
 | `AZURE_STORAGE_CONTAINER` | Defaults to `media` |
+
+Shipping (Velocity Shipping) is configured from the dashboard rather than the
+environment — Admin → Shipping holds the credentials, the pickup warehouse and
+the default parcel. The `VELOCITY_*` variables only seed that row on first use,
+so they can stay empty.
+
+One scheduled job is required, though, or parcels never move past
+"manifested": nothing polls the courier on a page view.
+
+| Job | Command | Cadence |
+|---|---|---|
+| Tracking sync | `python manage.py sync_shipment_tracking` | Every 15–30 min |
+
+On App Service this is a triggered WebJob (or an Azure Container Apps job / a
+cron entry wherever the backend runs). Each run pulls courier scans for every
+open consignment and walks the matching orders forward, which is what sends
+customers their "shipped" and "delivered" mail. It is safe to run
+concurrently and safe to re-run: scans are deduplicated and orders never move
+backwards.
 
 ## 7. GitHub Actions CI/CD
 

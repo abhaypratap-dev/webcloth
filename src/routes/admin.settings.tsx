@@ -24,6 +24,15 @@ type StoreSettings = {
   free_shipping_threshold: string | null;
   tax_percent: string;
   order_email_enabled: boolean;
+  order_prefix: string;
+  email_from_name: string;
+  email_from_address: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_use_tls: boolean;
+  smtp_configured: boolean;
+  smtp_password?: string;
 };
 
 function AdminSettings() {
@@ -97,8 +106,28 @@ function AdminSettings() {
         </Section>
 
         <Section title="Email">
+          <p className="text-xs text-muted-foreground">
+            {form.smtp_configured
+              ? "Order and account emails go out through your own mail server, under your name."
+              : "No mail server yet — customers will not receive order or password-reset emails."}
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Sender name" value={form.email_from_name} onChange={(e) => set("email_from_name", e.target.value)} />
+            <Input label="Sender address" type="email" value={form.email_from_address}
+              onChange={(e) => set("email_from_address", e.target.value)} />
+            <Input label="SMTP server" placeholder="smtp.gmail.com" value={form.smtp_host}
+              onChange={(e) => set("smtp_host", e.target.value)} />
+            <Input label="Port" type="number" value={form.smtp_port}
+              onChange={(e) => set("smtp_port", Number(e.target.value))} />
+            <Input label="Username" value={form.smtp_username} onChange={(e) => set("smtp_username", e.target.value)} />
+            <Input label={form.smtp_configured ? "Password (blank keeps it)" : "Password"} type="password"
+              value={form.smtp_password ?? ""} onChange={(e) => set("smtp_password", e.target.value)} />
+          </div>
+          <Toggle label="Use TLS" checked={form.smtp_use_tls} onChange={(v) => set("smtp_use_tls", v)} />
           <Toggle label="Send order confirmation emails" checked={form.order_email_enabled}
             onChange={(v) => set("order_email_enabled", v)} />
+          <Input label="Order number prefix" value={form.order_prefix}
+            onChange={(e) => set("order_prefix", e.target.value.toUpperCase())} />
         </Section>
 
         {message && <p className="text-xs text-muted-foreground">{message}</p>}

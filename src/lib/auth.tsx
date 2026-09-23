@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { api, clearTokens, getAccessToken, setTokens } from "./api";
+import { api, clearTokens, getAccessToken, getRefreshToken, setTokens } from "./api";
 
 export type User = {
   id: number;
@@ -73,7 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    const refresh = typeof window !== "undefined" ? localStorage.getItem("cutcult:refresh") : null;
+    // Via the client, not a literal key: storage is namespaced per brand.
+    const refresh = getRefreshToken();
     try {
       if (refresh) await api("/auth/logout/", { method: "POST", body: { refresh } });
     } catch {

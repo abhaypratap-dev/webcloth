@@ -37,7 +37,8 @@ and checking out require a registered account.
 │   │   ├── cart/            # server cart, totals service (shipping/tax/coupon)
 │   │   ├── wishlist/
 │   │   ├── orders/          # checkout, lifecycle, invoice, admin management
-│   │   ├── payments/        # modular gateways: COD / Razorpay / Stripe
+│   │   ├── payments/        # modular gateways: COD / UPI / bank / Razorpay / Stripe
+│   │   ├── shipping/        # Velocity Shipping: manifest, track, cancel, returns
 │   │   ├── reviews/         # verified-purchase reviews + moderation
 │   │   ├── banners/         # homepage banners + aggregated homepage endpoint
 │   │   ├── cms/             # static pages + FAQs
@@ -144,9 +145,10 @@ All endpoints are under `/api/`. Selected routes:
 | Cart | `cart/`, `cart/items/`, `cart/items/{id}/`, `cart/coupon/` |
 | Wishlist | `wishlist/`, `wishlist/toggle/`, `wishlist/ids/` |
 | Orders | `orders/`, `orders/checkout/`, `orders/{id}/cancel/`, `orders/{id}/invoice/` |
-| Payments | `payments/create/`, `payments/verify/` |
+| Payments | `payments/create/`, `payments/verify/`, `payments/submit/` |
+| Shipping | `shipping/orders/{id}/tracking/` (customer), `shipping/admin/*` (settings, warehouses, serviceability, shipments, reports) |
 | Reviews | `reviews/` (CRUD), `reviews/admin/` (moderation) |
-| Admin | `products/admin/`, `orders/admin/`, `auth/admin/customers/`, `coupons/`, `offers/`, `inventory/`, `dashboard/stats/`, `settings/`, `banners/`, `cms/` |
+| Admin | `products/admin/`, `orders/admin/`, `auth/admin/customers/`, `coupons/`, `offers/`, `inventory/`, `dashboard/stats/`, `settings/`, `banners/`, `cms/`, `shipping/admin/` |
 
 Responses use standard HTTP status codes; errors are normalised to
 `{ "detail": "...", "errors": {...} }`.
@@ -159,6 +161,33 @@ Responses use standard HTTP status codes; errors are normalised to
 and `verify()`. Cash on Delivery, Razorpay, and Stripe are implemented; add a
 new gateway by subclassing `BaseGateway` and registering it in `GATEWAYS`.
 COD works with no configuration; Razorpay/Stripe activate when their keys are set.
+
+---
+
+## Shipping
+
+`apps/shipping/` integrates Velocity Shipping (formerly Shipfast) for courier
+booking and tracking. `velocity.py` is the API client — token caching, one
+silent re-auth on a 401, and one error type; `services.py` is the workflow the
+store actually walks:
+
+1. **Serviceability** — which couriers run this lane, checked before promising
+   anything.
+2. **Manifest** — turn an order into a consignment with an AWB and a printable
+   label. A named courier is used if given, otherwise Velocity's own shipping
+   rules choose. The order moves to *packed*.
+3. **Track** — `python manage.py sync_shipment_tracking` (run every 15–30
+   minutes) pulls courier scans and walks orders forward through *shipped*,
+   *out for delivery* and *delivered*, mailing the customer at each step.
+4. **Cancel** — recall a parcel that has not been picked up. Cancelling the
+   order here does this too, unless switched off.
+5. **Return** — book a reverse pickup from the customer back to the warehouse,
+   for the whole order or a subset of its items.
+
+Connect the account and register a pickup warehouse under **Admin → Shipping**;
+the `VELOCITY_*` environment variables only seed that configuration on first
+use. Nothing ships until it is switched on there, so the store runs unchanged
+without it.
 
 ---
 

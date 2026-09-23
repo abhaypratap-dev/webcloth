@@ -10,6 +10,7 @@ import {
   PAYMENT_STATUS_LABELS,
   type ManualPayment,
   type Order,
+  type Shipment,
 } from "@/lib/account";
 import { AccountShell } from "@/components/site/AccountShell";
 import { api } from "@/lib/api";
@@ -152,10 +153,16 @@ function OrderCard({
                 </li>
               ))}
             </ol>
-            {order.tracking_number && (
-              <p className="mt-4 text-xs text-muted-foreground">
-                Tracking no. <span className="text-bone">{order.tracking_number}</span>
-              </p>
+            {order.shipments?.length ? (
+              order.shipments.map((shipment) => (
+                <ParcelPanel key={shipment.id} shipment={shipment} />
+              ))
+            ) : (
+              order.tracking_number && (
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Tracking no. <span className="text-bone">{order.tracking_number}</span>
+                </p>
+              )
             )}
             <div className="mt-8 flex flex-wrap gap-3">
               <button onClick={() => openInvoice(order.id)} className="btn-ghost">Invoice</button>
@@ -173,6 +180,76 @@ function OrderCard({
         </div>
       </motion.div>
     </li>
+  );
+}
+
+const PARCEL_STATUS_LABELS: Record<string, string> = {
+  created: "Waiting for a courier",
+  manifested: "Ready for pickup",
+  in_transit: "On its way",
+  out_for_delivery: "Out for delivery",
+  delivered: "Delivered",
+  rto: "Returning to us",
+  cancelled: "Cancelled",
+  failed: "Could not be booked",
+};
+
+/**
+ * The courier's own view of a parcel: who has it, the AWB, and every scan.
+ *
+ * Shown alongside the order's status history rather than replacing it — the
+ * two answer different questions ("what have we done" vs "where is my box"),
+ * and the scans carry the detail customers actually write in to ask about.
+ */
+function ParcelPanel({ shipment }: { shipment: Shipment }) {
+  return (
+    <div className="mt-6 border border-hairline p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-eyebrow">
+          {shipment.kind === "return" ? "Return pickup" : "Your parcel"}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {PARCEL_STATUS_LABELS[shipment.status] ?? shipment.status}
+        </span>
+      </div>
+
+      {shipment.awb_code && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {shipment.carrier || "Courier"} · tracking no.{" "}
+          <span className="text-bone font-mono">{shipment.awb_code}</span>
+        </p>
+      )}
+
+      {shipment.events.length > 0 && (
+        <ol className="mt-4 space-y-3 border-t border-hairline pt-4">
+          {shipment.events.map((scan, i) => (
+            <li key={i} className="flex items-start gap-3 text-sm">
+              <span
+                className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${i === 0 ? "bg-bone" : "bg-bone/30"}`}
+              />
+              <div>
+                <div className={i === 0 ? "" : "text-muted-foreground"}>{scan.activity}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {scan.raw_date}
+                  {scan.location ? ` · ${scan.location}` : ""}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {shipment.track_url && (
+        <a
+          href={shipment.track_url}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-4 inline-block text-eyebrow link-underline"
+        >
+          Track with {shipment.carrier || "the courier"} →
+        </a>
+      )}
+    </div>
   );
 }
 

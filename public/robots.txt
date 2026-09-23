@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Staff and customer areas. These also carry a noindex meta tag, but a
+# crawler should not be spending its budget here in the first place.
+Disallow: /admin
+Disallow: /account
+Disallow: /checkout
+Disallow: /auth
+Disallow: /reset-password

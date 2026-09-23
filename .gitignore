@@ -34,3 +34,16 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local dev
+.dev-logs/
+.env.local
+
+# Each of these is now its own repository, so that access to one brand's UI
+# can be granted without handing over the rest of the platform:
+#   backend/             -> platform-api
+#   orenda-atelier-main/ -> orenda-web
+#   saas-console/        -> saas-console
+backend/
+orenda-atelier-main/
+saas-console/

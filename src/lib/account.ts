@@ -32,6 +32,29 @@ export type OrderItem = {
 
 export type OrderEvent = { status: string; note: string; created_at: string };
 
+/** One courier scan on a parcel, newest first as the API returns them. */
+export type ShipmentScan = {
+  activity: string;
+  location: string;
+  occurred_at: string | null;
+  raw_date: string;
+};
+
+/** A parcel with the courier, as much of it as the customer should see. */
+export type Shipment = {
+  id: number;
+  kind: "forward" | "return";
+  status: string;
+  awb_code: string;
+  carrier: string;
+  track_url: string;
+  /** The courier's own wording, e.g. "out for delivery". */
+  tracking_status: string;
+  last_tracked_at: string | null;
+  created_at: string;
+  events: ShipmentScan[];
+};
+
 export type Order = {
   id: number;
   order_number: string;
@@ -49,6 +72,8 @@ export type Order = {
   tracking_number: string;
   items: OrderItem[];
   events: OrderEvent[];
+  /** Velocity consignments — forward parcels and any return pickups. */
+  shipments: Shipment[];
   can_cancel: boolean;
   /** Present only on UPI / bank-transfer orders, which settle out-of-band. */
   manual_payment: ManualPayment | null;

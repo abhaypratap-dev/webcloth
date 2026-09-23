@@ -1,17 +1,11 @@
-name: Deploy Frontend (Azure Static Web Apps)
+# Deploys the Cut & Cult storefront (and its admin at /admin) to Azure Static
+# Web Apps. This repo holds only this brand's UI; the API lives in
+# platform-api and serves every brand.
+name: Deploy Cut & Cult
 
 on:
   push:
     branches: [main]
-    paths:
-      - "src/**"
-      - "public/**"
-      - "patches/**"
-      - "package.json"
-      - "package-lock.json"
-      - "vite.config.ts"
-      - "tsconfig.json"
-      - ".github/workflows/deploy-frontend.yml"
   pull_request:
     types: [opened, synchronize, reopened, closed]
   workflow_dispatch:
@@ -19,31 +13,22 @@ on:
 jobs:
   build_and_deploy:
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
-    name: Build and deploy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: false
-
       - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-
+        with: { node-version: "22", cache: npm }
       - run: npm ci
-
-      # VITE_API_URL is baked into the client bundle at build time — it must
-      # point at the deployed backend before this step runs.
-      - name: Build (Azure SWA / Nitro azure-swa preset)
+      - run: npx tsc --noEmit
+      # Baked in at build time. VITE_TENANT_SLUG is what tells the shared API
+      # which brand this site is.
+      - name: Build
         run: npm run build:azure
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          # Public origin, baked in for absolute og:image/twitter:image URLs.
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_TENANT_SLUG: ${{ vars.VITE_TENANT_SLUG }}
           VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
-
-      - name: Deploy to Azure Static Web Apps
-        uses: Azure/static-web-apps-deploy@v1
+      - uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -56,12 +41,9 @@ jobs:
 
   close_pull_request:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    name: Close PR preview environment
     runs-on: ubuntu-latest
     steps:
-      - name: Close PR preview
-        uses: Azure/static-web-apps-deploy@v1
+      - uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "close"

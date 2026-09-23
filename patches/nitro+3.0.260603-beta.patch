@@ -1,20 +1,67 @@
 diff --git a/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs b/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs
-index c85effc..9f296f2 100644
+index c85effc..f1f95b5 100644
 --- a/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs
 +++ b/node_modules/nitro/dist/presets/azure/runtime/azure-swa.mjs
-@@ -14,7 +14,9 @@ export async function handle(context, req) {
- 		
- 		url = "/api/" + (req.params.url || "");
+@@ -3,29 +3,52 @@ import { parseURL } from "ufo";
+ import { useNitroApp } from "nitro/app";
+ import { getAzureParsedCookiesFromHeaders } from "./_utils.mjs";
+ const nitroApp = useNitroApp();
+-export async function handle(context, req) {
+-	let url;
+-	if (req.headers["x-ms-original-url"]) {
+-		
+-		const parsedURL = parseURL(req.headers["x-ms-original-url"]);
+-		url = parsedURL.pathname + parsedURL.search;
+-	} else {
++// Hop-by-hop or recomputed headers: forwarding them would describe the
++// proxy's connection or the original body length, not this Request's.
++const SKIP_HEADERS = new Set(["host", "connection", "content-length", "transfer-encoding", "keep-alive"]);
+ 
+-		
+-		url = "/api/" + (req.params.url || "");
++function toHeaders(raw) {
++	const headers = new Headers();
++	for (const [key, value] of Object.entries(raw || {})) {
++		if (value == null || SKIP_HEADERS.has(key.toLowerCase())) continue;
++		for (const v of Array.isArray(value) ? value : [value]) headers.append(key, String(v));
  	}
 -	const request = new Request(url, {
-+	const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
-+	const proto = req.headers["x-forwarded-proto"] || "https";
-+	const request = new Request(`${proto}://${host}${url}`, {
- 		method: req.method || undefined,
- 		
- 		
-@@ -25,7 +27,7 @@ export async function handle(context, req) {
+-		method: req.method || undefined,
+-		
++	return headers;
++}
  
+-		body: req.bufferBody ?? req.rawBody
++export async function handle(context, req) {
++	// Azure puts the visitor's full URL here, host included. Prefer it, so the
++	// app sees the address actually used (custom domain and all) rather than
++	// the internal function host - same-origin checks compare against it.
++	const original = req.headers["x-ms-original-url"];
++	let href;
++	if (original) {
++		const parsed = parseURL(original);
++		const host = parsed.host || req.headers["x-forwarded-host"] || req.headers.host || "localhost";
++		const proto = (parsed.protocol || "https:").replace(/:$/, "");
++		href = `${proto}://${host}${parsed.pathname}${parsed.search}`;
++	} else {
++		const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
++		const proto = req.headers["x-forwarded-proto"] || "https";
++		href = `${proto}://${host}/api/${req.params.url || ""}`;
++	}
++	const method = (req.method || "GET").toUpperCase();
++	const request = new Request(href, {
++		method,
++		// Upstream built the Request without these at all, so cookies, auth,
++		// content-type and the Sec-Fetch-*/Origin/Referer headers that
++		// TanStack Start's CSRF check relies on never reached the app, and
++		// every client-side server-function call was refused with a 403.
++		headers: toHeaders(req.headers),
++		// GET/HEAD must not carry a body or the Request constructor throws.
++		body: method === "GET" || method === "HEAD" ? undefined : (req.bufferBody ?? req.rawBody)
+ 	});
+ 	const response = await nitroApp.fetch(request);
+ 	
+ 	
  	context.res = {
  		status: response.status,
 -		body: response.body,

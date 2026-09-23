@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, useNavigate } from "@tanstack/react-rout
 import { useEffect } from "react";
 import {
   LayoutDashboard, Package, FolderTree, Tags, Boxes, ShoppingCart,
-  Users, TicketPercent, BadgePercent, Star, Image, FileText, Settings, CreditCard,
+  Users, TicketPercent, BadgePercent, Star, Image, FileText, Settings, CreditCard, Truck,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Logo } from "@/components/site/Logo";
@@ -20,6 +20,7 @@ const NAV = [
   { to: "/admin/inventory", label: "Inventory", icon: Boxes },
   { to: "/admin/orders", label: "Orders", icon: ShoppingCart },
   { to: "/admin/payments", label: "Payments", icon: CreditCard },
+  { to: "/admin/shipping", label: "Shipping", icon: Truck },
   { to: "/admin/customers", label: "Customers", icon: Users },
   { to: "/admin/coupons", label: "Coupons", icon: TicketPercent },
   { to: "/admin/offers", label: "Offers", icon: BadgePercent },

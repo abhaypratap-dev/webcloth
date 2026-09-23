@@ -4,10 +4,20 @@
  */
 
 export const API_URL: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8001/api";
+  (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000/api";
 
-const ACCESS_KEY = "cutcult:access";
-const REFRESH_KEY = "cutcult:refresh";
+/**
+ * Which brand this deployment talks to. One API serves every brand and keeps
+ * each in its own database, so a request without this header is answered with
+ * a 404 rather than a guess.
+ */
+export const TENANT_SLUG: string =
+  (import.meta.env.VITE_TENANT_SLUG as string | undefined) ?? "cutcult";
+
+// Namespaced by brand so two storefronts on one origin during local
+// development cannot read each other's session.
+const ACCESS_KEY = `${TENANT_SLUG}:access`;
+const REFRESH_KEY = `${TENANT_SLUG}:refresh`;
 
 const isBrowser = typeof window !== "undefined";
 
@@ -51,7 +61,7 @@ async function tryRefresh(): Promise<boolean> {
     try {
       const res = await fetch(`${API_URL}/auth/refresh/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Tenant": TENANT_SLUG },
         body: JSON.stringify({ refresh }),
       });
       if (!res.ok) {
@@ -75,6 +85,7 @@ type ApiOptions = Omit<RequestInit, "body"> & { body?: unknown };
 export async function api<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
   const doFetch = async () => {
     const headers = new Headers(options.headers);
+    headers.set("X-Tenant", TENANT_SLUG);
     const token = getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
     let body: BodyInit | undefined;
