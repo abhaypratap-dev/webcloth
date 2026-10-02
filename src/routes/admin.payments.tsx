@@ -5,6 +5,7 @@ import { api, type Paginated } from "@/lib/api";
 import {
   Btn, Chip, Input, money, PageHead, TextArea, Toggle, Table, Td, useInvalidate,
 } from "@/components/admin/kit";
+import { RazorpayFields } from "@/components/admin/RazorpayFields";
 
 export const Route = createFileRoute("/admin/payments")({
   component: AdminPayments,
@@ -29,6 +30,14 @@ type PaymentMethod = {
   bank_ifsc: string;
   bank_name: string;
   bank_branch: string;
+  razorpay_key_id: string;
+  razorpay_key_secret: string;
+  razorpay_webhook_secret: string;
+  razorpay_key_secret_set?: boolean;
+  razorpay_webhook_secret_set?: boolean;
+  razorpay_mode?: string;
+  razorpay_webhook_ready?: boolean;
+  razorpay_webhook_url?: string;
 };
 
 type AdminPayment = {
@@ -202,7 +211,12 @@ function MethodCard({ method }: { method: PaymentMethod }) {
     try {
       // upi_qr_url and configuration_error are read-only; the file itself goes
       // up through uploadQr() instead.
-      const { upi_qr_url, configuration_error, label, is_manual, ...writable } = body;
+      const {
+        upi_qr_url, configuration_error, label, is_manual,
+        razorpay_key_secret_set, razorpay_webhook_secret_set,
+        razorpay_mode, razorpay_webhook_ready, razorpay_webhook_url,
+        ...writable
+      } = body;
       await api(`/payments/admin/methods/${method.id}/`, { method: "PATCH", body: writable });
       await queryClient.invalidateQueries({ queryKey: ["admin", "payment-methods"] });
       setMessage("Saved.");
@@ -271,6 +285,8 @@ function MethodCard({ method }: { method: PaymentMethod }) {
               onChange={(e) => set("description", e.target.value)}
             />
           </div>
+
+          {method.method === "razorpay" && <RazorpayFields form={form} set={set} />}
 
           {method.method === "upi" && (
             <div className="space-y-4">

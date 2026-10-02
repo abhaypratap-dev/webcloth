@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { listAddresses, placeOrder, type Order } from "@/lib/account";
 import { api } from "@/lib/api";
+import { payWithRazorpay } from "@/lib/razorpay";
 import { AddressForm } from "./account_.addresses";
 
 export const Route = createFileRoute("/checkout")({
@@ -141,17 +142,28 @@ function Checkout() {
       // Kick off the gateway record. For UPI/bank this returns the merchant's
       // pay-to details, which the customer needs on the very next screen.
       const chosen = methods?.find((m) => m.method === payment);
-      try {
-        const created = await api<{ payment_id: number }>("/payments/create/", {
-          method: "POST",
-          body: { order_id: order.id },
-        });
-        if (chosen?.is_manual) {
-          setManualPayment({ paymentId: created.payment_id, method: chosen });
+
+      if (payment === "razorpay") {
+        // Razorpay collects the money in a modal, and payWithRazorpay creates
+        // the payment record itself. Only our own server's verification, or
+        // the webhook, marks the order paid.
+        const outcome = await payWithRazorpay(order.id);
+        if (!outcome.paid && outcome.reason && outcome.reason !== "closed" && outcome.reason !== "pending") {
+          setError(outcome.reason);
         }
-      } catch {
-        // Payment can be retried from the order screen; order itself is placed.
-        if (chosen?.is_manual) setManualPayment({ paymentId: null, method: chosen });
+      } else {
+        try {
+          const created = await api<{ payment_id: number }>("/payments/create/", {
+            method: "POST",
+            body: { order_id: order.id },
+          });
+          if (chosen?.is_manual) {
+            setManualPayment({ paymentId: created.payment_id, method: chosen });
+          }
+        } catch {
+          // Payment can be retried from the order screen; order itself is placed.
+          if (chosen?.is_manual) setManualPayment({ paymentId: null, method: chosen });
+        }
       }
       await cart.refresh();
       queryClient.invalidateQueries({ queryKey: ["orders"] });
