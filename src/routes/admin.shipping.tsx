@@ -110,6 +110,12 @@ function SettingsPanel() {
           onChange={(v) => set("is_enabled", v)}
         />
 
+        <p className="text-sm opacity-70">
+          In Velocity, go to Settings → API Keys and choose Generate API Key. Name it, pick an
+          expiry (up to a year) and copy it — Velocity shows it only once. The key belongs to this
+          store alone; each label needs its own. Up to five active keys per account.
+        </p>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Select
             label="Environment"
@@ -121,16 +127,10 @@ function SettingsPanel() {
             onChange={(e) => set("base_url", e.target.value)}
           />
           <Input
-            label="Username (mobile with country code)"
-            value={value.username}
-            placeholder="+919866340090"
-            onChange={(e) => set("username", e.target.value)}
-          />
-          <Input
-            label={settings.has_credentials ? "Password (leave blank to keep)" : "Password"}
+            label={settings.has_credentials ? "API key — saved, type to replace" : "API key"}
             type="password"
             value={password}
-            placeholder={settings.has_credentials ? "••••••••" : ""}
+            placeholder={settings.has_credentials ? "••••••••••••" : "Paste the key from Velocity"}
             onChange={(e) => {
               setSaved(false);
               setPassword(e.target.value);
@@ -191,7 +191,7 @@ function SettingsPanel() {
           <Btn
             variant="primary"
             disabled={save.isPending}
-            onClick={() => save.mutate({ ...draft, ...(password ? { password } : {}) })}
+            onClick={() => save.mutate({ ...draft, ...(password.trim() ? { api_key: password.trim() } : {}) })}
           >
             {save.isPending ? "…" : "Save"}
           </Btn>

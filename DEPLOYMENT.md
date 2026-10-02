@@ -315,7 +315,7 @@ Media storage (see Known Issues — uploaded images 404 without this):
 
 Shipping (Velocity Shipping) is configured from the dashboard rather than the
 environment — Admin → Shipping holds the credentials, the pickup warehouse and
-the default parcel. The `VELOCITY_*` variables only seed that row on first use,
+the default parcel. `VELOCITY_BASE_URL` only seeds that row on first use,
 so they can stay empty.
 
 One scheduled job is required, though, or parcels never move past

@@ -28,7 +28,7 @@ export type ShipmentScan = {
 export type ShippingSettings = {
   is_enabled: boolean;
   base_url: string;
-  username: string;
+  api_key?: string;
   /** Write-only — the API never sends it back. Use `has_credentials`. */
   password?: string;
   default_warehouse: number | null;
@@ -42,7 +42,7 @@ export type ShippingSettings = {
   auto_ship_on_status: string;
   cancel_shipment_with_order: boolean;
   has_credentials: boolean;
-  token_is_valid: boolean;
+  is_staging: boolean;
   /** Non-empty while the integration cannot be switched on yet. */
   configuration_error: string;
   updated_at: string;
