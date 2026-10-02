@@ -178,7 +178,7 @@ function OrderPanel({ order, onClose }: { order: AdminOrder; onClose: () => void
           {error && <p className="text-xs text-destructive">{error}</p>}
           <div className="flex gap-3">
             <Btn variant="primary" onClick={apply} disabled={saving}>{saving ? "…" : "Apply"}</Btn>
-            <Btn onClick={() => openInvoice(order.id)}>Invoice</Btn>
+            <Btn onClick={() => openInvoice(order.id, { admin: true })}>Invoice</Btn>
           </div>
         </div>
 

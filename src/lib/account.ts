@@ -171,11 +171,18 @@ export async function placeOrder(payload: {
  * await has resolved is outside the click that asked for it, and browsers
  * block it.
  */
-export async function openInvoice(orderId: number) {
+export async function openInvoice(orderId: number, options: { admin?: boolean } = {}) {
+  // Two routes render the same invoice: the customer one only ever finds the
+  // caller's own orders, which is what keeps one shopper from reading
+  // another's. An admin screen asking through it finds nothing at all for
+  // every order but their own — "No Order matches the given query."
+  const path = options.admin
+    ? `/orders/admin/${orderId}/invoice/`
+    : `/orders/${orderId}/invoice/`;
   const tab = window.open("", "_blank");
   let url = "";
   try {
-    const blob = await apiBlob(`/orders/${orderId}/invoice/`);
+    const blob = await apiBlob(path);
     url = URL.createObjectURL(blob);
     if (tab && !tab.closed) {
       tab.location.href = url;
