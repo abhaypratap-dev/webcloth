@@ -38,6 +38,8 @@ type PaymentMethod = {
   razorpay_mode?: string;
   razorpay_webhook_ready?: boolean;
   razorpay_webhook_url?: string;
+  razorpay_webhook_events?: string[];
+  razorpay_last_event?: { type: string; at: string } | null;
 };
 
 type AdminPayment = {
@@ -215,6 +217,7 @@ function MethodCard({ method }: { method: PaymentMethod }) {
         upi_qr_url, configuration_error, label, is_manual,
         razorpay_key_secret_set, razorpay_webhook_secret_set,
         razorpay_mode, razorpay_webhook_ready, razorpay_webhook_url,
+        razorpay_webhook_events, razorpay_last_event,
         ...writable
       } = body;
       await api(`/payments/admin/methods/${method.id}/`, { method: "PATCH", body: writable });
