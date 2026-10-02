@@ -82,7 +82,16 @@ async function tryRefresh(): Promise<boolean> {
 
 type ApiOptions = Omit<RequestInit, "body"> & { body?: unknown };
 
-export async function api<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+/**
+ * One request to the API, with the brand header, the token, and one retry
+ * after refreshing an expired one.
+ *
+ * Everything that talks to the API goes through here. A plain `fetch` would
+ * omit `X-Tenant`, and the backend answers a request that names no brand with
+ * a 404 — which reads as a missing endpoint rather than a missing header, and
+ * is how the invoice link stayed broken.
+ */
+export async function apiRequest(path: string, options: ApiOptions = {}): Promise<Response> {
   const doFetch = async () => {
     const headers = new Headers(options.headers);
     headers.set("X-Tenant", TENANT_SLUG);
@@ -104,6 +113,28 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
   if (res.status === 401 && getRefreshToken()) {
     if (await tryRefresh()) res = await doFetch();
   }
+  return res;
+}
+
+/** A response the API does not send as JSON — an invoice, an export. */
+export async function apiBlob(path: string, options: ApiOptions = {}): Promise<Blob> {
+  const res = await apiRequest(path, options);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let detail = `Request failed (${res.status})`;
+    try {
+      const parsed = JSON.parse(text) as { detail?: unknown };
+      if (parsed?.detail) detail = String(parsed.detail);
+    } catch {
+      // Not JSON; the status is all we have to go on.
+    }
+    throw new ApiError(res.status, detail);
+  }
+  return res.blob();
+}
+
+export async function api<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+  const res = await apiRequest(path, options);
 
   if (res.status === 204 || res.status === 205) return undefined as T;
 

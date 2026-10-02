@@ -1,4 +1,4 @@
-import { api, API_URL, getAccessToken, type Paginated } from "./api";
+import { api, apiBlob, type Paginated } from "./api";
 import { resolveAsset } from "./assets";
 import type { ProductListItem } from "./products";
 
@@ -160,14 +160,40 @@ export async function placeOrder(payload: {
   return fixOrder(await api<Order>("/orders/checkout/", { method: "POST", body: payload }));
 }
 
+/**
+ * Opens an order's invoice in a new tab.
+ *
+ * Goes through the shared client so it carries the brand header and refreshes
+ * an expired token — a bare fetch sent neither, and the API answered with a
+ * 404 that read as a missing endpoint.
+ *
+ * The tab is opened before the request, not after: a popup opened once an
+ * await has resolved is outside the click that asked for it, and browsers
+ * block it.
+ */
 export async function openInvoice(orderId: number) {
-  // The invoice endpoint needs the JWT, so fetch it and open as a blob.
-  const res = await fetch(`${API_URL}/orders/${orderId}/invoice/`, {
-    headers: { Authorization: `Bearer ${getAccessToken()}` },
-  });
-  if (!res.ok) throw new Error("Could not load invoice");
-  const blob = await res.blob();
-  window.open(URL.createObjectURL(blob), "_blank");
+  const tab = window.open("", "_blank");
+  let url = "";
+  try {
+    const blob = await apiBlob(`/orders/${orderId}/invoice/`);
+    url = URL.createObjectURL(blob);
+    if (tab && !tab.closed) {
+      tab.location.href = url;
+    } else {
+      // Popup blocked, or the tab was closed while we waited. Fall back to a
+      // download, which never needs a window.
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `invoice-${orderId}.html`;
+      link.click();
+    }
+  } catch (error) {
+    tab?.close();
+    throw error;
+  } finally {
+    // The tab has loaded it by now; holding the blob any longer just leaks it.
+    if (url) setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
 }
 
 export async function listWishlist(): Promise<ProductListItem[]> {
