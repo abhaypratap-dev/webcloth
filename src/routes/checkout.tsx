@@ -9,7 +9,9 @@ import { payWithRazorpay } from "@/lib/razorpay";
 import { AddressForm } from "./account_.addresses";
 
 export const Route = createFileRoute("/checkout")({
-  head: () => ({ meta: [{ title: "Checkout — Cut & Cult" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({
+    meta: [{ title: "Checkout — Cut & Cult" }, { name: "robots", content: "noindex" }],
+  }),
   component: Checkout,
 });
 
@@ -45,6 +47,8 @@ function Checkout() {
   const [error, setError] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
+  // Why an order that was placed is not yet paid, shown on the confirmation.
+  const [paymentNote, setPaymentNote] = useState<string | null>(null);
   // Set when the placed order needs the customer to pay out-of-band and come
   // back with a reference (UPI / bank transfer).
   const [manualPayment, setManualPayment] = useState<{
@@ -99,9 +103,18 @@ function Checkout() {
         <p className="mt-6 text-muted-foreground max-w-md mx-auto">
           A confirmation is on its way. Your pieces are being prepared with care.
         </p>
+        {paymentNote && (
+          <p className="mt-6 text-sm text-destructive max-w-md mx-auto">
+            {paymentNote} Your order is saved — you can pay for it from your orders.
+          </p>
+        )}
         <div className="mt-12 flex items-center justify-center gap-4">
-          <Link to="/account/orders" className="btn-cult">Track order</Link>
-          <Link to="/" className="btn-ghost">Return home</Link>
+          <Link to="/account/orders" className="btn-cult">
+            Track order
+          </Link>
+          <Link to="/" className="btn-ghost">
+            Return home
+          </Link>
         </div>
       </div>
     );
@@ -112,7 +125,9 @@ function Checkout() {
       <div className="pt-40 text-center">
         <p className="text-eyebrow">Empty</p>
         <h1 className="mt-4 text-large-display text-[2rem]">Your bag is empty.</h1>
-        <Link to="/shop" className="btn-cult mt-10">Shop the collection</Link>
+        <Link to="/shop" className="btn-cult mt-10">
+          Shop the collection
+        </Link>
       </div>
     );
   }
@@ -134,11 +149,22 @@ function Checkout() {
     }
     setPlacing(true);
     setError(null);
+    let order: Order;
     try {
-      const order = await placeOrder({
+      order = await placeOrder({
         shipping_address_id: addressId,
         payment_method: payment,
       });
+    } catch (e: any) {
+      setError(e.message);
+      setPlacing(false);
+      return;
+    }
+    // From here the order exists and the server has emptied the bag, so
+    // nothing below may send the customer back to the form: a second submit
+    // only meets "Your bag is empty." Payment trouble is reported on the
+    // confirmation instead, and payment can be retried from the order.
+    try {
       // Kick off the gateway record. For UPI/bank this returns the merchant's
       // pay-to details, which the customer needs on the very next screen.
       const chosen = methods?.find((m) => m.method === payment);
@@ -148,8 +174,13 @@ function Checkout() {
         // the payment record itself. Only our own server's verification, or
         // the webhook, marks the order paid.
         const outcome = await payWithRazorpay(order.id);
-        if (!outcome.paid && outcome.reason && outcome.reason !== "closed" && outcome.reason !== "pending") {
-          setError(outcome.reason);
+        if (
+          !outcome.paid &&
+          outcome.reason &&
+          outcome.reason !== "closed" &&
+          outcome.reason !== "pending"
+        ) {
+          setPaymentNote(outcome.reason);
         }
       } else {
         try {
@@ -165,14 +196,13 @@ function Checkout() {
           if (chosen?.is_manual) setManualPayment({ paymentId: null, method: chosen });
         }
       }
-      await cart.refresh();
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      setPlacedOrder(order);
     } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setPlacing(false);
+      setPaymentNote(e.message);
     }
+    await cart.refresh().catch(() => {});
+    queryClient.invalidateQueries({ queryKey: ["orders"] });
+    setPlacedOrder(order);
+    setPlacing(false);
   }
 
   return (
@@ -189,7 +219,9 @@ function Checkout() {
                   <label
                     key={address.id}
                     className={`flex items-start gap-4 border p-4 cursor-pointer transition ${
-                      addressId === address.id ? "border-bone" : "border-hairline hover:border-bone/40"
+                      addressId === address.id
+                        ? "border-bone"
+                        : "border-hairline hover:border-bone/40"
                     }`}
                   >
                     <input
@@ -201,10 +233,13 @@ function Checkout() {
                     />
                     <span className="text-sm leading-relaxed">
                       <span className="font-medium">{address.full_name}</span>
-                      {address.is_default && <span className="text-eyebrow ml-3 opacity-60">Default</span>}
+                      {address.is_default && (
+                        <span className="text-eyebrow ml-3 opacity-60">Default</span>
+                      )}
                       <br />
                       <span className="text-muted-foreground">
-                        {address.line1}{address.line2 ? `, ${address.line2}` : ""}, {address.city}{" "}
+                        {address.line1}
+                        {address.line2 ? `, ${address.line2}` : ""}, {address.city}{" "}
                         {address.postal_code}, {address.country} · {address.phone}
                       </span>
                     </span>
@@ -217,7 +252,12 @@ function Checkout() {
                 initial={{
                   full_name: auth.user?.full_name ?? "",
                   phone: auth.user?.mobile ?? "",
-                  line1: "", line2: "", city: "", state: "", postal_code: "", country: "India",
+                  line1: "",
+                  line2: "",
+                  city: "",
+                  state: "",
+                  postal_code: "",
+                  country: "India",
                   is_default: (addresses?.length ?? 0) === 0,
                 }}
                 addressId={null}
@@ -313,7 +353,10 @@ function Checkout() {
             {cart.coupon_code ? (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-eyebrow">Coupon — {cart.coupon_code}</span>
-                <button onClick={() => cart.removeCoupon()} className="text-eyebrow opacity-60 hover:opacity-100">
+                <button
+                  onClick={() => cart.removeCoupon()}
+                  className="text-eyebrow opacity-60 hover:opacity-100"
+                >
                   Remove
                 </button>
               </div>
@@ -341,7 +384,10 @@ function Checkout() {
           <div className="mt-6 space-y-3 border-t border-hairline pt-6 text-sm">
             <Row label="Subtotal" value={`₹${cart.subtotal.toFixed(2)}`} />
             {cart.discount > 0 && <Row label="Discount" value={`−₹${cart.discount.toFixed(2)}`} />}
-            <Row label="Shipping" value={cart.shipping === 0 ? "Free" : `₹${cart.shipping.toFixed(2)}`} />
+            <Row
+              label="Shipping"
+              value={cart.shipping === 0 ? "Free" : `₹${cart.shipping.toFixed(2)}`}
+            />
             {cart.tax > 0 && <Row label="Tax (GST)" value={`₹${cart.tax.toFixed(2)}`} />}
             <Row label="Total" value={`₹${cart.total.toFixed(2)}`} bold />
           </div>
@@ -362,7 +408,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className={`flex justify-between ${bold ? "text-base font-medium pt-2 border-t border-hairline" : "text-muted-foreground"}`}>
+    <div
+      className={`flex justify-between ${bold ? "text-base font-medium pt-2 border-t border-hairline" : "text-muted-foreground"}`}
+    >
       <span className={bold ? "" : "text-eyebrow"}>{label}</span>
       <span>{value}</span>
     </div>
@@ -423,13 +471,16 @@ function ManualPaymentStep({
         <p className="text-eyebrow">Order placed — {order.order_number}</p>
         <h1 className="mt-6 text-large-display">Thanks. We&rsquo;re checking.</h1>
         <p className="mt-6 text-muted-foreground max-w-md mx-auto">
-          We&rsquo;ve got your payment reference and we&rsquo;ll confirm it shortly. Your
-          pieces are reserved in the meantime, and you&rsquo;ll get an email the moment
-          the payment clears.
+          We&rsquo;ve got your payment reference and we&rsquo;ll confirm it shortly. Your pieces are
+          reserved in the meantime, and you&rsquo;ll get an email the moment the payment clears.
         </p>
         <div className="mt-12 flex items-center justify-center gap-4">
-          <Link to="/account/orders" className="btn-cult">Track order</Link>
-          <Link to="/" className="btn-ghost">Return home</Link>
+          <Link to="/account/orders" className="btn-cult">
+            Track order
+          </Link>
+          <Link to="/" className="btn-ghost">
+            Return home
+          </Link>
         </div>
       </div>
     );
@@ -440,8 +491,8 @@ function ManualPaymentStep({
       <p className="text-eyebrow">Order placed — {order.order_number}</p>
       <h1 className="mt-4 text-large-display">Now pay ₹{order.total.toFixed(2)}</h1>
       <p className="mt-4 text-sm text-muted-foreground">
-        Your order is reserved but not confirmed yet. Send the exact amount using the
-        details below, then tell us the reference so we can match it.
+        Your order is reserved but not confirmed yet. Send the exact amount using the details below,
+        then tell us the reference so we can match it.
       </p>
 
       <div className="mt-10 border border-hairline p-6 space-y-5">
@@ -471,9 +522,7 @@ function ManualPaymentStep({
 
       <form onSubmit={submit} className="mt-10 space-y-5">
         <label className="block">
-          <span className="block text-eyebrow mb-1.5 opacity-70">
-            Payment reference / UTR
-          </span>
+          <span className="block text-eyebrow mb-1.5 opacity-70">Payment reference / UTR</span>
           <input
             value={reference}
             onChange={(e) => setReference(e.target.value)}
@@ -483,9 +532,7 @@ function ManualPaymentStep({
         </label>
 
         <label className="block">
-          <span className="block text-eyebrow mb-1.5 opacity-70">
-            Screenshot (optional)
-          </span>
+          <span className="block text-eyebrow mb-1.5 opacity-70">Screenshot (optional)</span>
           <input
             type="file"
             accept="image/*"
@@ -501,7 +548,10 @@ function ManualPaymentStep({
         </button>
         <p className="text-xs text-muted-foreground text-center">
           Not ready? You can come back to this from{" "}
-          <Link to="/account/orders" className="link-underline">your orders</Link>.
+          <Link to="/account/orders" className="link-underline">
+            your orders
+          </Link>
+          .
         </p>
       </form>
     </div>
