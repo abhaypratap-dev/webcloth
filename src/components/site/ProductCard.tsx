@@ -17,7 +17,9 @@ export function ProductCard({ p, index = 0 }: { p: ProductListItem; index?: numb
             src={p.image}
             alt={p.title}
             loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-[1400ms] ease-[cubic-bezier(0.7,0,0.2,1)] group-hover:scale-[1.06]"
+            className={`absolute inset-0 h-full w-full object-cover transition-transform duration-[1400ms] ease-[cubic-bezier(0.7,0,0.2,1)] group-hover:scale-[1.06] ${
+              p.in_stock ? "" : "opacity-60 grayscale-[40%]"
+            }`}
           />
           {p.hover_image && (
             <img
@@ -27,6 +29,11 @@ export function ProductCard({ p, index = 0 }: { p: ProductListItem; index?: numb
               loading="lazy"
               className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-1000 group-hover:opacity-100"
             />
+          )}
+          {!p.in_stock && (
+            <span className="absolute left-4 bottom-4 text-eyebrow bg-ink/80 backdrop-blur px-2 py-1">
+              Out of stock
+            </span>
           )}
           {p.new_arrival && (
             <span className="absolute left-4 top-4 text-eyebrow bg-ink/70 backdrop-blur px-2 py-1">
@@ -46,7 +53,9 @@ export function ProductCard({ p, index = 0 }: { p: ProductListItem; index?: numb
         </div>
         <div className="pt-5 flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-sm font-medium truncate group-hover:opacity-70 transition">{p.title}</div>
+            <div className="text-sm font-medium truncate group-hover:opacity-70 transition">
+              {p.title}
+            </div>
             {p.category && (
               <div className="text-eyebrow mt-1 opacity-60">{p.category.replace(/-/g, " ")}</div>
             )}
@@ -55,7 +64,9 @@ export function ProductCard({ p, index = 0 }: { p: ProductListItem; index?: numb
             {p.discount_price != null ? (
               <span className="flex items-baseline gap-2">
                 <span>₹{p.discount_price.toFixed(0)}</span>
-                <span className="text-muted-foreground line-through text-xs">₹{p.price.toFixed(0)}</span>
+                <span className="text-muted-foreground line-through text-xs">
+                  ₹{p.price.toFixed(0)}
+                </span>
               </span>
             ) : (
               <>₹{p.price.toFixed(0)}</>

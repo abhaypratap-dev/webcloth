@@ -94,6 +94,9 @@ function ProductPage() {
               </>
             )}
           </div>
+          {!p.in_stock && (
+            <p className="mt-4 inline-block text-eyebrow border border-hairline px-3 py-2">Out of stock</p>
+          )}
           {(reviews?.length ?? 0) > 0 && p.rating_avg != null && (
             <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
               <Stars value={p.rating_avg} />
@@ -164,7 +167,7 @@ function ProductPage() {
               disabled={stock === 0 || cart.loading}
               className="btn-cult flex-1 disabled:opacity-40"
             >
-              {stock === 0 ? "Sold out" : cart.loading ? "Adding…" : "Add to bag"}
+              {stock === 0 ? "Out of stock" : cart.loading ? "Adding…" : "Add to bag"}
             </button>
             <button
               aria-label="Wishlist"

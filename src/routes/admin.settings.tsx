@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Btn, Input, PageHead, Toggle } from "@/components/admin/kit";
+import { Btn, Input, PageHead, Select, Toggle } from "@/components/admin/kit";
 
 export const Route = createFileRoute("/admin/settings")({
   component: AdminSettings,
@@ -24,6 +24,7 @@ type StoreSettings = {
   free_shipping_threshold: string | null;
   tax_percent: string;
   order_email_enabled: boolean;
+  out_of_stock_display: "show" | "hide";
   order_prefix: string;
   email_from_name: string;
   email_from_address: string;
@@ -89,6 +90,23 @@ function AdminSettings() {
             <Input label="Facebook" value={form.facebook_url} onChange={(e) => set("facebook_url", e.target.value)} />
             <Input label="YouTube" value={form.youtube_url} onChange={(e) => set("youtube_url", e.target.value)} />
           </div>
+        </Section>
+
+        <Section title="Products">
+          <Select
+            label="When a product is out of stock (0 left in every size)"
+            value={form.out_of_stock_display}
+            onChange={(e) => set("out_of_stock_display", e.target.value as StoreSettings["out_of_stock_display"])}
+            options={[
+              { value: "show", label: "Show it, marked “Out of stock”" },
+              { value: "hide", label: "Hide it from the store" },
+            ]}
+          />
+          <p className="text-xs text-muted-foreground">
+            {form.out_of_stock_display === "hide"
+              ? "Sold-out products disappear from the shop, search, collections and homepage, and come back by themselves when restocked. Their own page still opens from a saved link, marked out of stock."
+              : "Sold-out products stay in the shop with an “Out of stock” badge and cannot be added to the bag."}
+          </p>
         </Section>
 
         <Section title="Shipping & GST">
