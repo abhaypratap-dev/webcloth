@@ -13,6 +13,7 @@ import teeImg from "@/assets/product-tee.jpg";
 import hoodieImg from "@/assets/product-hoodie.jpg";
 import pantsImg from "@/assets/product-pants.jpg";
 import shirtImg from "@/assets/product-shirt.jpg";
+import { responsive } from "@/lib/assets";
 
 const homeOptions = queryOptions({
   queryKey: ["homepage"],
@@ -75,7 +76,7 @@ function Hero({ banner }: { banner?: Banner }) {
     <section ref={ref} className="relative h-[100svh] min-h-[720px] w-full overflow-hidden bg-ink">
       <motion.div style={{ y }} className="absolute inset-0">
         <img
-          src={image}
+          {...responsive(image, "100vw", 1920)}
           alt=""
           className="h-full w-full object-cover opacity-70 animate-ken-burns"
           fetchPriority="high"
@@ -224,9 +225,10 @@ function Categories({ categories }: { categories: Category[] }) {
               className="group relative block overflow-hidden aspect-[3/4] bg-secondary"
             >
               <img
-                src={c.image || CATEGORY_IMAGES[c.slug]}
+                {...responsive(c.image || CATEGORY_IMAGES[c.slug], "(min-width: 768px) 33vw, 50vw")}
                 alt={c.name}
                 loading="lazy"
+                decoding="async"
                 className="absolute inset-0 h-full w-full object-cover opacity-80 transition-transform duration-[1400ms] ease-[cubic-bezier(0.7,0,0.2,1)] group-hover:scale-110 group-hover:opacity-100"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-transparent to-transparent" />
@@ -282,9 +284,10 @@ function Lookbook() {
             className={`${s.tall ? "md:row-span-2 md:aspect-[3/5]" : "aspect-[3/4]"} relative overflow-hidden bg-secondary group`}
           >
             <img
-              src={s.src}
+              {...responsive(s.src, "(min-width: 768px) 33vw, 100vw")}
               alt=""
               loading="lazy"
+              decoding="async"
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-[1600ms] ease-[cubic-bezier(0.7,0,0.2,1)] group-hover:scale-105"
             />
           </motion.div>

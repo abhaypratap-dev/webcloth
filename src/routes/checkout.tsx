@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { payWithRazorpay } from "@/lib/razorpay";
 import { OtpLogin } from "@/components/site/OtpLogin";
 import { PhoneInput } from "@/components/site/PhoneInput";
+import { sized } from "@/lib/assets";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -321,7 +322,7 @@ function Checkout() {
           <ul className="divide-y divide-hairline">
             {cart.items.map((i) => (
               <li key={i.id} className="flex gap-4 py-4">
-                <img src={i.image} alt={i.title} className="h-20 w-16 object-cover" />
+                <img src={sized(i.image, 160)} alt={i.title} className="h-20 w-16 object-cover" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{i.title}</div>
                   <div className="text-eyebrow mt-1 opacity-70">

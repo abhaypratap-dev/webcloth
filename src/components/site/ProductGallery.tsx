@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { responsive, sized } from "@/lib/assets";
 
 const EASE = [0.7, 0, 0.2, 1] as const;
 const SWIPE_THRESHOLD = 60;
@@ -38,7 +39,13 @@ export function ProductGallery({ images, title }: { images: GalleryImage[]; titl
                 i === index ? "opacity-100" : "opacity-45 hover:opacity-80"
               }`}
             >
-              <img src={img.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img
+                src={sized(img.url, 160)}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
               {i === index && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-bone" />}
             </button>
           ))}
@@ -60,7 +67,7 @@ export function ProductGallery({ images, title }: { images: GalleryImage[]; titl
             onDragEnd={onDragEnd}
           >
             <img
-              src={active.url}
+              {...responsive(active.url, "(min-width: 768px) 50vw, 100vw")}
               alt={active.alt ?? title}
               className="h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.7,0,0.2,1)] group-hover:scale-110"
               draggable={false}

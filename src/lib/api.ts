@@ -133,7 +133,36 @@ export async function apiBlob(path: string, options: ApiOptions = {}): Promise<B
   return res.blob();
 }
 
+/**
+ * Public reads made while rendering on the server, shared for a few seconds.
+ *
+ * The SSR function runs in a different region from the API, so every page
+ * render paid several cross-region round trips for the same settings,
+ * navigation, content and catalogue. A warm instance now answers those from
+ * memory. Only token-less GETs on the server are cached — never anything a
+ * signed-in browser asks for — and each caller gets its own copy.
+ */
+const SSR_CACHE_MS = 30_000;
+const ssrCache = new Map<string, { at: number; data: Promise<unknown> }>();
+
 export async function api<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+  const method = (options.method ?? "GET").toUpperCase();
+  if (typeof window !== "undefined" || method !== "GET" || getAccessToken()) {
+    return fetchJson<T>(path, options);
+  }
+  const hit = ssrCache.get(path);
+  if (hit && Date.now() - hit.at < SSR_CACHE_MS) {
+    return structuredClone(await hit.data) as T;
+  }
+  const data = fetchJson<T>(path, options);
+  ssrCache.set(path, { at: Date.now(), data });
+  // A failure is not worth remembering; the next render should try again.
+  data.catch(() => ssrCache.delete(path));
+  if (ssrCache.size > 500) ssrCache.delete(ssrCache.keys().next().value!);
+  return structuredClone(await data) as T;
+}
+
+async function fetchJson<T>(path: string, options: ApiOptions): Promise<T> {
   const res = await apiRequest(path, options);
 
   if (res.status === 204 || res.status === 205) return undefined as T;

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X, Minus, Plus } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { Link } from "@tanstack/react-router";
+import { sized } from "@/lib/assets";
 
 export function CartDrawer() {
   const cart = useCart();
@@ -44,7 +45,7 @@ export function CartDrawer() {
                 <ul className="divide-y divide-hairline">
                   {cart.items.map((i) => (
                     <li key={i.id} className="flex gap-4 p-6">
-                      <img src={i.image} alt={i.title} className="h-28 w-24 object-cover" loading="lazy" />
+                      <img src={sized(i.image, 320)} alt={i.title} className="h-28 w-24 object-cover" loading="lazy" decoding="async" />
                       <div className="flex-1 min-w-0 flex flex-col">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">

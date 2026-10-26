@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import type { ProductListItem } from "@/lib/products";
+import { responsive } from "@/lib/assets";
 
 export function ProductCard({ p, index = 0 }: { p: ProductListItem; index?: number }) {
   return (
@@ -14,19 +15,25 @@ export function ProductCard({ p, index = 0 }: { p: ProductListItem; index?: numb
       <Link to="/product/$slug" params={{ slug: p.slug }} className="block">
         <div className="relative overflow-hidden bg-secondary aspect-[4/5]">
           <img
-            src={p.image}
+            {...responsive(p.image, "(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw", 960)}
             alt={p.title}
             loading="lazy"
+            decoding="async"
             className={`absolute inset-0 h-full w-full object-cover transition-transform duration-[1400ms] ease-[cubic-bezier(0.7,0,0.2,1)] group-hover:scale-[1.06] ${
               p.in_stock ? "" : "opacity-60 grayscale-[40%]"
             }`}
           />
           {p.hover_image && (
             <img
-              src={p.hover_image}
+              {...responsive(
+                p.hover_image,
+                "(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw",
+                960,
+              )}
               alt=""
               aria-hidden
               loading="lazy"
+              decoding="async"
               className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-1000 group-hover:opacity-100"
             />
           )}
