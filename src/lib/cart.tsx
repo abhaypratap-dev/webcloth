@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "@tanstack/react-router";
 
-import { api } from "./api";
+import { api, TENANT_SLUG } from "./api";
 import { resolveAsset } from "./assets";
 import { useAuth } from "./auth";
 
@@ -64,73 +63,165 @@ function fixImages(cart: CartData): CartData {
   return { ...cart, items: cart.items.map((i) => ({ ...i, image: resolveAsset(i.image) })) };
 }
 
+/**
+ * A visitor's bag before they sign in: just what was picked, in this
+ * browser. The API prices it (/cart/preview/) so offers and stock are always
+ * current, and folds it into their account cart on sign-in (/cart/merge/).
+ */
+type GuestLine = { product_id: number; variant_id: number | null; quantity: number };
+
+// Namespaced like the tokens, so two storefronts on one origin keep separate bags.
+const GUEST_KEY = `${TENANT_SLUG}:bag`;
+
+function readGuest(): GuestLine[] {
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem(GUEST_KEY) : null;
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeGuest(lines: GuestLine[]) {
+  try {
+    if (lines.length) localStorage.setItem(GUEST_KEY, JSON.stringify(lines));
+    else localStorage.removeItem(GUEST_KEY);
+  } catch {
+    // Private mode or blocked storage: the bag lasts for this page only.
+  }
+}
+
+const sameLine = (a: { product_id: number; variant_id: number | null }, b: typeof a) =>
+  a.product_id === b.product_id && (a.variant_id ?? null) === (b.variant_id ?? null);
+
 export function CartProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [cart, setCart] = useState<CartData>(EMPTY);
   const [isOpen, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const refresh = useCallback(async () => {
-    if (!isAuthenticated) {
+  const priceGuest = useCallback(async (lines: GuestLine[]) => {
+    writeGuest(lines);
+    if (!lines.length) {
       setCart(EMPTY);
       return;
     }
+    const priced = fixImages(
+      await api<CartData>("/cart/preview/", { method: "POST", body: { items: lines } }),
+    );
+    // Sold-out or withdrawn lines come back dropped; forget them here too.
+    writeGuest(
+      priced.items.map((i) => ({ product_id: i.product_id, variant_id: i.variant_id, quantity: i.quantity })),
+    );
+    setCart(priced);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    if (authLoading) return;
     try {
+      if (!isAuthenticated) {
+        await priceGuest(readGuest());
+        return;
+      }
+      const guest = readGuest();
+      if (guest.length) {
+        // Just signed in with a bag in hand: it joins the account's cart.
+        setCart(fixImages(await api<CartData>("/cart/merge/", { method: "POST", body: { items: guest } })));
+        writeGuest([]);
+        return;
+      }
       setCart(fixImages(await api<CartData>("/cart/")));
     } catch {
       // keep last known cart on transient failures
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading, priceGuest]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  const guard = useCallback(() => {
-    if (!isAuthenticated) {
-      navigate({ to: "/auth" });
-      return false;
-    }
-    return true;
-  }, [isAuthenticated, navigate]);
+  // Guest lines carry the id the preview gave them; map it back to the product.
+  const guestLine = useCallback(
+    (id: number) => {
+      const item = cart.items.find((i) => i.id === id);
+      return item ? { product_id: item.product_id, variant_id: item.variant_id } : null;
+    },
+    [cart.items],
+  );
 
   const add = useCallback<CartCtx["add"]>(
     async (item, qty = 1) => {
-      if (!guard()) return;
       setLoading(true);
       try {
-        setCart(
-          fixImages(
-            await api<CartData>("/cart/items/", {
-              method: "POST",
-              body: { product_id: item.product_id, variant_id: item.variant_id, quantity: qty },
-            }),
-          ),
-        );
+        if (!isAuthenticated) {
+          const lines = readGuest();
+          const existing = lines.find((l) => sameLine(l, item));
+          if (existing) existing.quantity = Math.min(existing.quantity + qty, 20);
+          else lines.push({ product_id: item.product_id, variant_id: item.variant_id, quantity: qty });
+          await priceGuest(lines);
+        } else {
+          setCart(
+            fixImages(
+              await api<CartData>("/cart/items/", {
+                method: "POST",
+                body: { product_id: item.product_id, variant_id: item.variant_id, quantity: qty },
+              }),
+            ),
+          );
+        }
         setOpen(true);
       } finally {
         setLoading(false);
       }
     },
-    [guard],
+    [isAuthenticated, priceGuest],
   );
 
-  const setQty = useCallback(async (id: number, qty: number) => {
-    setCart(fixImages(await api<CartData>(`/cart/items/${id}/`, { method: "PATCH", body: { quantity: qty } })));
-  }, []);
+  const setQty = useCallback(
+    async (id: number, qty: number) => {
+      if (!isAuthenticated) {
+        const target = guestLine(id);
+        if (!target) return;
+        const stock = cart.items.find((i) => i.id === id)?.stock ?? 20;
+        const lines = readGuest()
+          .map((l) => (sameLine(l, target) ? { ...l, quantity: Math.min(qty, stock, 20) } : l))
+          .filter((l) => l.quantity > 0);
+        await priceGuest(lines);
+        return;
+      }
+      setCart(fixImages(await api<CartData>(`/cart/items/${id}/`, { method: "PATCH", body: { quantity: qty } })));
+    },
+    [isAuthenticated, guestLine, cart.items, priceGuest],
+  );
 
-  const remove = useCallback(async (id: number) => {
-    setCart(fixImages(await api<CartData>(`/cart/items/${id}/`, { method: "DELETE" })));
-  }, []);
+  const remove = useCallback(
+    async (id: number) => {
+      if (!isAuthenticated) {
+        const target = guestLine(id);
+        if (target) await priceGuest(readGuest().filter((l) => !sameLine(l, target)));
+        return;
+      }
+      setCart(fixImages(await api<CartData>(`/cart/items/${id}/`, { method: "DELETE" })));
+    },
+    [isAuthenticated, guestLine, priceGuest],
+  );
 
   const clear = useCallback(async () => {
+    if (!isAuthenticated) {
+      await priceGuest([]);
+      return;
+    }
     setCart(fixImages(await api<CartData>("/cart/", { method: "DELETE" })));
-  }, []);
+  }, [isAuthenticated, priceGuest]);
 
-  const applyCoupon = useCallback(async (code: string) => {
-    setCart(fixImages(await api<CartData>("/cart/coupon/", { method: "POST", body: { code } })));
-  }, []);
+  const applyCoupon = useCallback(
+    async (code: string) => {
+      if (!isAuthenticated) throw new Error("Sign in to use a coupon.");
+      setCart(fixImages(await api<CartData>("/cart/coupon/", { method: "POST", body: { code } })));
+    },
+    [isAuthenticated],
+  );
 
   const removeCoupon = useCallback(async () => {
     setCart(fixImages(await api<CartData>("/cart/coupon/", { method: "DELETE" })));

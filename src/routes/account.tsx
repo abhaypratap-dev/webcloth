@@ -30,7 +30,7 @@ function Account() {
     <div className="pt-32 pb-24 px-5 md:px-10 max-w-5xl mx-auto">
       <p className="text-eyebrow">Members</p>
       <h1 className="mt-4 text-large-display">Your world</h1>
-      <p className="mt-4 text-muted-foreground">{auth.user.full_name} · {auth.user.email}</p>
+      <p className="mt-4 text-muted-foreground">{[auth.user.full_name, auth.user.email || auth.user.mobile].filter(Boolean).join(" · ")}</p>
 
       <div className="mt-16 grid md:grid-cols-3 gap-4">
         {CARDS.map((c) => (

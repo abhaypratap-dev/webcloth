@@ -34,6 +34,11 @@ type StoreSettings = {
   smtp_use_tls: boolean;
   smtp_configured: boolean;
   smtp_password?: string;
+  whatsapp_otp_enabled: boolean;
+  whatsapp_instance_id: string;
+  whatsapp_api_url: string;
+  whatsapp_configured: boolean;
+  whatsapp_access_token?: string;
 };
 
 function AdminSettings() {
@@ -148,10 +153,62 @@ function AdminSettings() {
             onChange={(e) => set("order_prefix", e.target.value.toUpperCase())} />
         </Section>
 
+        <Section title="WhatsApp sign-in codes">
+          <p className="text-xs text-muted-foreground">
+            {form.whatsapp_configured && form.whatsapp_otp_enabled
+              ? "Customers can sign in with their mobile number; codes arrive on WhatsApp. A code asked for by email also goes to the account's WhatsApp."
+              : "Off — customers sign in with their email. Connect your WhatsAutoBot instance to let them use a mobile number."}
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Instance ID" placeholder="MMAU000000" value={form.whatsapp_instance_id}
+              onChange={(e) => set("whatsapp_instance_id", e.target.value.trim())} />
+            <Input label={form.whatsapp_configured ? "Access token (blank keeps it)" : "Access token"} type="password"
+              value={form.whatsapp_access_token ?? ""} onChange={(e) => set("whatsapp_access_token", e.target.value.trim())} />
+          </div>
+          <Toggle label="Send sign-in codes on WhatsApp" checked={form.whatsapp_otp_enabled}
+            onChange={(v) => set("whatsapp_otp_enabled", v)} />
+          <WhatsAppTest configured={form.whatsapp_configured} />
+        </Section>
+
         {message && <p className="text-xs text-muted-foreground">{message}</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}
         <Btn variant="primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save settings"}</Btn>
       </div>
+    </div>
+  );
+}
+
+/** Send one message with the saved credentials, before customers depend on them. */
+function WhatsAppTest({ configured }: { configured: boolean }) {
+  const [mobile, setMobile] = useState("");
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [sending, setSending] = useState(false);
+
+  async function send() {
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await api<{ detail: string }>("/settings/whatsapp-test/", { method: "POST", body: { mobile } });
+      setResult({ ok: true, text: res.detail });
+    } catch (e: any) {
+      setResult({ ok: false, text: e.message });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (!configured) {
+    return <p className="text-xs text-muted-foreground">Save an instance ID and token to send a test message.</p>;
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex items-end gap-3">
+        <div className="flex-1">
+          <Input label="Send a test to" placeholder="98765 43210" value={mobile} onChange={(e) => setMobile(e.target.value)} />
+        </div>
+        <Btn onClick={send} disabled={sending || !mobile.trim()}>{sending ? "Sending…" : "Send test"}</Btn>
+      </div>
+      {result && <p className={`text-xs ${result.ok ? "text-muted-foreground" : "text-destructive"}`}>{result.text}</p>}
     </div>
   );
 }

@@ -4,8 +4,11 @@ A production-ready clothing e-commerce platform. A React (TanStack Start, SSR)
 storefront powered by a modular Django REST Framework backend on PostgreSQL,
 with JWT auth, a full payment architecture, and a custom admin dashboard.
 
-Public visitors can browse the whole catalogue; adding to cart, wishlisting,
-and checking out require a registered account.
+Public visitors can browse the whole catalogue and fill a bag (held in the
+browser until they sign in). Checking out and wishlisting need an account, and
+signing in takes only an email or mobile number and a one-time code — the
+account is created the first time. Codes go by email, and by WhatsApp for
+brands that connect a WhatsAutoBot instance in Settings.
 
 ---
 

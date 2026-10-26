@@ -1,12 +1,13 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
-import { listAddresses, placeOrder, type Order } from "@/lib/account";
+import { createAddress, listAddresses, placeOrder, type Address, type Order } from "@/lib/account";
 import { api } from "@/lib/api";
 import { payWithRazorpay } from "@/lib/razorpay";
-import { AddressForm } from "./account_.addresses";
+import { OtpLogin } from "@/components/site/OtpLogin";
+import { PhoneInput } from "@/components/site/PhoneInput";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -36,11 +37,11 @@ type PaymentMethod = {
 function Checkout() {
   const auth = useAuth();
   const cart = useCart();
-  const nav = useNavigate();
   const queryClient = useQueryClient();
 
   const [addressId, setAddressId] = useState<number | null>(null);
-  const [showAddressForm, setShowAddressForm] = useState(false);
+  // The delivery-details popup: "new" to add an address, "pick" to choose.
+  const [addressModal, setAddressModal] = useState<"new" | "pick" | null>(null);
   const [payment, setPayment] = useState<string>("");
   const [couponInput, setCouponInput] = useState("");
   const [couponError, setCouponError] = useState<string | null>(null);
@@ -55,10 +56,6 @@ function Checkout() {
     paymentId: number | null;
     method: PaymentMethod;
   } | null>(null);
-
-  useEffect(() => {
-    if (!auth.loading && !auth.isAuthenticated) nav({ to: "/auth" });
-  }, [auth.loading, auth.isAuthenticated, nav]);
 
   const { data: addresses } = useQuery({
     queryKey: ["addresses"],
@@ -79,9 +76,11 @@ function Checkout() {
     if (addressId === null && addresses?.length) {
       setAddressId((addresses.find((a) => a.is_default) ?? addresses[0]).id);
     }
-  }, [addresses, addressId]);
+    // Nowhere to deliver yet: ask straight away rather than make them find a button.
+    if (addresses && addresses.length === 0 && cart.items.length > 0) setAddressModal("new");
+  }, [addresses, addressId, cart.items.length]);
 
-  if (auth.loading || !auth.isAuthenticated) {
+  if (auth.loading) {
     return <div className="pt-40 text-center text-eyebrow">Loading</div>;
   }
 
@@ -142,9 +141,11 @@ function Checkout() {
     }
   }
 
+  const address = addresses?.find((a) => a.id === addressId) ?? null;
+
   async function submit() {
     if (addressId === null) {
-      setError("Choose a shipping address first.");
+      setAddressModal("new");
       return;
     }
     setPlacing(true);
@@ -208,128 +209,111 @@ function Checkout() {
   return (
     <div className="pt-32 pb-24 px-5 md:px-10 max-w-6xl mx-auto">
       <p className="text-eyebrow">Checkout</p>
-      <h1 className="mt-4 text-large-display">Details</h1>
+      <h1 className="mt-4 text-large-display">
+        {auth.isAuthenticated ? "Details" : "Almost yours"}
+      </h1>
 
       <div className="grid md:grid-cols-[1.3fr_1fr] gap-16 mt-12">
         <div className="space-y-10">
-          <Section title="Shipping address">
-            {(addresses?.length ?? 0) > 0 && (
-              <div className="space-y-3">
-                {addresses!.map((address) => (
-                  <label
-                    key={address.id}
-                    className={`flex items-start gap-4 border p-4 cursor-pointer transition ${
-                      addressId === address.id
-                        ? "border-bone"
-                        : "border-hairline hover:border-bone/40"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="address"
-                      checked={addressId === address.id}
-                      onChange={() => setAddressId(address.id)}
-                      className="mt-1 accent-current"
-                    />
-                    <span className="text-sm leading-relaxed">
-                      <span className="font-medium">{address.full_name}</span>
-                      {address.is_default && (
-                        <span className="text-eyebrow ml-3 opacity-60">Default</span>
-                      )}
-                      <br />
-                      <span className="text-muted-foreground">
-                        {address.line1}
-                        {address.line2 ? `, ${address.line2}` : ""}, {address.city}{" "}
-                        {address.postal_code}, {address.country} · {address.phone}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-            {showAddressForm ? (
-              <AddressForm
-                initial={{
-                  full_name: auth.user?.full_name ?? "",
-                  phone: auth.user?.mobile ?? "",
-                  line1: "",
-                  line2: "",
-                  city: "",
-                  state: "",
-                  postal_code: "",
-                  country: "India",
-                  is_default: (addresses?.length ?? 0) === 0,
-                }}
-                addressId={null}
-                onDone={(saved) => {
-                  setShowAddressForm(false);
-                  setAddressId(saved.id);
-                  setError(null);
-                  queryClient.invalidateQueries({ queryKey: ["addresses"] });
-                }}
-                onCancel={() => setShowAddressForm(false)}
-              />
-            ) : (
-              <button type="button" onClick={() => setShowAddressForm(true)} className="btn-ghost">
-                + New address
-              </button>
-            )}
-          </Section>
-
-          <Section title="Payment">
-            {methods === undefined ? (
-              <p className="text-xs text-muted-foreground">Loading payment methods…</p>
-            ) : methods.length === 0 ? (
-              <p className="text-xs text-destructive">
-                No payment methods are available right now. Please try again shortly.
+          {!auth.isAuthenticated ? (
+            <Section title="1 — Sign in">
+              <p className="text-sm text-muted-foreground -mt-2">
+                Enter your mobile number or email and we&rsquo;ll send you a code. No password, no
+                forms.
               </p>
-            ) : (
-              <div className="space-y-3">
-                {methods.map((method) => (
-                  <label
-                    key={method.method}
-                    className={`flex items-center gap-4 border p-4 cursor-pointer transition ${
-                      payment === method.method
-                        ? "border-bone"
-                        : "border-hairline hover:border-bone/40"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="payment"
-                      checked={payment === method.method}
-                      onChange={() => setPayment(method.method)}
-                      className="accent-current"
-                    />
-                    <span className="text-sm">
-                      <span className="font-medium">{method.label}</span>
-                      {method.description && (
-                        <span className="block text-xs text-muted-foreground mt-0.5">
-                          {method.description}
-                        </span>
-                      )}
-                      {method.is_manual && (
-                        <span className="block text-xs text-muted-foreground mt-0.5">
-                          You&rsquo;ll get our details on the next screen, and we&rsquo;ll confirm
-                          your payment before dispatch.
-                        </span>
-                      )}
-                    </span>
-                  </label>
-                ))}
+              <div className="max-w-sm">
+                <OtpLogin />
               </div>
-            )}
-          </Section>
+            </Section>
+          ) : (
+            <Section title="Deliver to">
+              {address ? (
+                <div className="flex items-start justify-between gap-6 border border-hairline p-4">
+                  <span className="text-sm leading-relaxed">
+                    <span className="font-medium">{address.full_name}</span>
+                    <br />
+                    <span className="text-muted-foreground">
+                      {address.line1}
+                      {address.line2 ? `, ${address.line2}` : ""}, {address.city}
+                      {address.state ? `, ${address.state}` : ""} {address.postal_code}
+                      <br />
+                      {address.phone}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAddressModal("pick")}
+                    className="text-eyebrow opacity-70 hover:opacity-100 shrink-0"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setAddressModal("new")} className="btn-ghost">
+                  + Add delivery details
+                </button>
+              )}
+            </Section>
+          )}
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          <button
-            type="button"
-            onClick={submit}
-            disabled={placing || !payment}
-            className="btn-cult w-full"
-          >
-            {placing ? "Placing order…" : `Place order — ₹${cart.total.toFixed(2)}`}
-          </button>
+          {auth.isAuthenticated && (
+            <>
+              <Section title="Payment">
+                {methods === undefined ? (
+                  <p className="text-xs text-muted-foreground">Loading payment methods…</p>
+                ) : methods.length === 0 ? (
+                  <p className="text-xs text-destructive">
+                    No payment methods are available right now. Please try again shortly.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {methods.map((method) => (
+                      <label
+                        key={method.method}
+                        className={`flex items-center gap-4 border p-4 cursor-pointer transition ${
+                          payment === method.method
+                            ? "border-bone"
+                            : "border-hairline hover:border-bone/40"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="payment"
+                          checked={payment === method.method}
+                          onChange={() => setPayment(method.method)}
+                          className="accent-current"
+                        />
+                        <span className="text-sm">
+                          <span className="font-medium">{method.label}</span>
+                          {method.description && (
+                            <span className="block text-xs text-muted-foreground mt-0.5">
+                              {method.description}
+                            </span>
+                          )}
+                          {method.is_manual && (
+                            <span className="block text-xs text-muted-foreground mt-0.5">
+                              You&rsquo;ll get our details on the next screen, and we&rsquo;ll
+                              confirm your payment before dispatch.
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </Section>
+
+              {error && <p className="text-xs text-destructive">{error}</p>}
+              <button
+                type="button"
+                onClick={submit}
+                disabled={placing || !payment}
+                className="btn-cult w-full"
+              >
+                {placing ? "Placing order…" : `Place order — ₹${cart.total.toFixed(2)}`}
+              </button>
+            </>
+          )}
         </div>
 
         <aside className="border-l border-hairline pl-8 md:pl-12">
@@ -350,7 +334,11 @@ function Checkout() {
           </ul>
 
           <div className="mt-6 border-t border-hairline pt-6">
-            {cart.coupon_code ? (
+            {!auth.isAuthenticated ? (
+              <p className="text-xs text-muted-foreground">
+                Have a coupon? Apply it once you&rsquo;re signed in.
+              </p>
+            ) : cart.coupon_code ? (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-eyebrow">Coupon — {cart.coupon_code}</span>
                 <button
@@ -393,7 +381,213 @@ function Checkout() {
           </div>
         </aside>
       </div>
+
+      {addressModal && (
+        <DeliveryModal
+          mode={addressModal}
+          addresses={addresses ?? []}
+          selectedId={addressId}
+          defaults={{ full_name: auth.user?.full_name ?? "", phone: auth.user?.mobile ?? "" }}
+          onSelect={(id) => {
+            setAddressId(id);
+            setAddressModal(null);
+            setError(null);
+          }}
+          onSaved={(saved) => {
+            setAddressId(saved.id);
+            setAddressModal(null);
+            setError(null);
+            queryClient.invalidateQueries({ queryKey: ["addresses"] });
+            // The first address names an account that signed up by code.
+            auth.refreshUser();
+          }}
+          onAddNew={() => setAddressModal("new")}
+          onClose={() => setAddressModal(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Delivery details in a popup: the only form at checkout. Either the short
+ * address form, or the saved addresses to pick from.
+ */
+function DeliveryModal({
+  mode,
+  addresses,
+  selectedId,
+  defaults,
+  onSelect,
+  onSaved,
+  onAddNew,
+  onClose,
+}: {
+  mode: "new" | "pick";
+  addresses: Address[];
+  selectedId: number | null;
+  defaults: { full_name: string; phone: string };
+  onSelect: (id: number) => void;
+  onSaved: (address: Address) => void;
+  onAddNew: () => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState({
+    full_name: defaults.full_name,
+    phone: defaults.phone,
+    postal_code: "",
+    line1: "",
+    line2: "",
+    city: "",
+    state: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      onSaved(
+        await createAddress({ ...form, country: "India", is_default: addresses.length === 0 }),
+      );
+    } catch (e: any) {
+      setError(e.message);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end md:items-center justify-center">
+      <div className="absolute inset-0 bg-ink/70 backdrop-blur-md" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Delivery details"
+        className="relative w-full md:max-w-lg max-h-[92vh] overflow-y-auto bg-ink border border-hairline p-6 md:p-8"
+      >
+        <div className="flex items-center justify-between mb-6">
+          <div className="text-eyebrow">{mode === "new" ? "Delivery details" : "Deliver to"}</div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-eyebrow opacity-60 hover:opacity-100"
+          >
+            Close
+          </button>
+        </div>
+
+        {mode === "pick" ? (
+          <div className="space-y-3">
+            {addresses.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => onSelect(a.id)}
+                className={`block w-full text-left border p-4 text-sm leading-relaxed transition ${
+                  a.id === selectedId ? "border-bone" : "border-hairline hover:border-bone/40"
+                }`}
+              >
+                <span className="font-medium">{a.full_name}</span>
+                <br />
+                <span className="text-muted-foreground">
+                  {a.line1}
+                  {a.line2 ? `, ${a.line2}` : ""}, {a.city} {a.postal_code} · {a.phone}
+                </span>
+              </button>
+            ))}
+            <button type="button" onClick={onAddNew} className="btn-ghost w-full">
+              + New address
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={save} className="space-y-5">
+            <ModalInput
+              label="Full name"
+              required
+              value={form.full_name}
+              onChange={set("full_name")}
+              autoComplete="name"
+            />
+            <PhoneInput
+              label="Mobile number"
+              value={form.phone}
+              onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
+              required
+            />
+            <ModalInput
+              label="PIN code"
+              required
+              value={form.postal_code}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, postal_code: e.target.value.replace(/\D/g, "") }))
+              }
+              maxLength={6}
+              inputMode="numeric"
+              autoComplete="postal-code"
+            />
+            <ModalInput
+              label="House / flat, street"
+              required
+              value={form.line1}
+              onChange={set("line1")}
+              autoComplete="address-line1"
+            />
+            <ModalInput
+              label="Area, landmark (optional)"
+              value={form.line2}
+              onChange={set("line2")}
+              autoComplete="address-line2"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <ModalInput
+                label="City"
+                required
+                value={form.city}
+                onChange={set("city")}
+                autoComplete="address-level2"
+              />
+              <ModalInput
+                label="State"
+                required
+                value={form.state}
+                onChange={set("state")}
+                autoComplete="address-level1"
+              />
+            </div>
+            {error && <p className="text-xs text-destructive">{error}</p>}
+            <button disabled={saving} className="btn-cult w-full">
+              {saving ? "Saving…" : "Continue to payment"}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ModalInput({
+  label,
+  ...rest
+}: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+  return (
+    <label className="block">
+      <span className="block text-eyebrow mb-2 opacity-70">{label}</span>
+      <input
+        {...rest}
+        className="w-full bg-transparent border-b border-hairline focus:border-bone py-3 outline-none text-sm transition-colors placeholder:text-muted-foreground/40"
+      />
+    </label>
   );
 }
 

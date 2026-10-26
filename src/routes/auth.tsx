@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { useAuth, VerificationRequired } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { SkullMark } from "@/components/site/Logo";
-import { PhoneInput } from "@/components/site/PhoneInput";
+import { OtpLogin } from "@/components/site/OtpLogin";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -12,58 +12,34 @@ export const Route = createFileRoute("/auth")({
   component: Auth,
 });
 
-type Mode = "signin" | "signup" | "forgot" | "verify";
+// Customers sign in by code only. The password form stays for staff, whose
+// accounts were made with one, and for anyone who prefers it.
+type Mode = "code" | "password" | "forgot";
 
 const HEADINGS: Record<Mode, { eyebrow: string; title: string }> = {
-  signin: { eyebrow: "Members", title: "Sign in" },
-  signup: { eyebrow: "Join the cult", title: "Create account" },
+  code: { eyebrow: "Members", title: "Sign in" },
+  password: { eyebrow: "Members", title: "Sign in with password" },
   forgot: { eyebrow: "Members", title: "Reset password" },
-  verify: { eyebrow: "One more step", title: "Check your email" },
 };
 
 function Auth() {
   const nav = useNavigate();
   const auth = useAuth();
-  const [mode, setMode] = useState<Mode>("signin");
-  const [fullName, setFullName] = useState("");
-  const [mobile, setMobile] = useState("");
+  const [mode, setMode] = useState<Mode>("code");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [code, setCode] = useState("");
-  const [pendingEmail, setPendingEmail] = useState("");
-  const [resendIn, setResendIn] = useState(0);
 
   useEffect(() => {
     if (auth.isAuthenticated) nav({ to: "/account" });
   }, [auth.isAuthenticated, nav]);
 
-  useEffect(() => {
-    if (resendIn <= 0) return;
-    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [resendIn]);
-
-  function awaitCode(pending: VerificationRequired) {
-    setPendingEmail(pending.email);
-    setResendIn(pending.retryAfter);
-    setCode("");
-    setInfo(pending.message);
-    setMode("verify");
-  }
-
-  async function resend() {
+  function switchTo(next: Mode) {
+    setMode(next);
     setError(null);
-    try {
-      const res = await auth.resendCode(pendingEmail);
-      setInfo(res.detail);
-      setResendIn(Number(res.retry_after) || 60);
-    } catch (e: any) {
-      setError(e.message);
-    }
+    setInfo(null);
   }
 
   async function submit(e: React.FormEvent) {
@@ -72,20 +48,8 @@ function Auth() {
     setError(null);
     setInfo(null);
     try {
-      if (mode === "signup") {
-        await auth.register({
-          full_name: fullName,
-          email,
-          mobile,
-          password,
-          confirm_password: confirmPassword,
-        });
-        nav({ to: "/account" });
-      } else if (mode === "signin") {
+      if (mode === "password") {
         await auth.login(email, password);
-        nav({ to: "/account" });
-      } else if (mode === "verify") {
-        await auth.verifyEmail(pendingEmail, code);
         nav({ to: "/account" });
       } else {
         const res = await api<{ detail: string }>("/auth/forgot-password/", {
@@ -95,8 +59,7 @@ function Auth() {
         setInfo(res.detail);
       }
     } catch (e: any) {
-      if (e instanceof VerificationRequired) awaitCode(e);
-      else setError(e.message);
+      setError(e.message);
     } finally {
       setLoading(false);
     }
@@ -113,126 +76,67 @@ function Auth() {
           <h1 className="mt-4 text-large-display text-[2rem]">{heading.title}</h1>
         </div>
 
-        <form onSubmit={submit} className="space-y-6">
-          {mode === "verify" && (
-            <Field label={`6-digit code sent to ${pendingEmail}`}>
+        {mode === "code" ? (
+          <OtpLogin onDone={() => nav({ to: "/account" })} />
+        ) : (
+          <form onSubmit={submit} className="space-y-6">
+            <Field label={mode === "password" ? "Email or mobile" : "Email"}>
               <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                maxLength={6}
-                required
-                autoFocus
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                className="w-full bg-transparent border-b border-hairline focus:border-bone py-3 outline-none text-2xl tracking-[0.5em] text-center"
-              />
-            </Field>
-          )}
-          {mode === "signup" && (
-            <>
-              <Field label="Full name">
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-transparent border-b border-hairline focus:border-bone py-3 outline-none text-sm"
-                />
-              </Field>
-              <PhoneInput label="Mobile number" value={mobile} onChange={setMobile} required />
-            </>
-          )}
-          {mode !== "verify" && (
-            <Field label="Email">
-              <input
-                type="email"
+                type={mode === "password" ? "text" : "email"}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-transparent border-b border-hairline focus:border-bone py-3 outline-none text-sm"
               />
             </Field>
-          )}
-          {(mode === "signin" || mode === "signup") && (
-            <Field label="Password">
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-transparent border-b border-hairline focus:border-bone py-3 outline-none text-sm"
-              />
-            </Field>
-          )}
-          {mode === "signup" && (
-            <Field label="Confirm password">
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-transparent border-b border-hairline focus:border-bone py-3 outline-none text-sm"
-              />
-            </Field>
-          )}
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          {info && <p className="text-xs text-muted-foreground">{info}</p>}
-          <button disabled={loading} className="btn-cult w-full">
-            {loading
-              ? "…"
-              : mode === "signin"
-                ? "Sign in"
-                : mode === "signup"
-                  ? "Create account"
-                  : mode === "verify"
-                    ? "Verify and continue"
-                    : "Send reset link"}
-          </button>
-        </form>
+            {mode === "password" && (
+              <Field label="Password">
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-transparent border-b border-hairline focus:border-bone py-3 outline-none text-sm"
+                />
+              </Field>
+            )}
+            {error && <p className="text-xs text-destructive">{error}</p>}
+            {info && <p className="text-xs text-muted-foreground">{info}</p>}
+            <button disabled={loading} className="btn-cult w-full">
+              {loading ? "…" : mode === "password" ? "Sign in" : "Send reset link"}
+            </button>
+          </form>
+        )}
 
         <div className="mt-8 text-center text-xs text-muted-foreground space-y-3">
-          {mode === "verify" && (
-            <div>
-              <button
-                type="button"
-                onClick={resend}
-                disabled={resendIn > 0}
-                className="link-underline uppercase tracking-widest disabled:opacity-50"
-              >
-                {resendIn > 0 ? `Resend code in ${resendIn}s` : "Resend code"}
-              </button>
-            </div>
-          )}
-          <div>
-            {mode === "signin" ? "New here? " : "Already have an account? "}
+          {mode === "code" ? (
             <button
-              onClick={() => {
-                setMode(mode === "signin" ? "signup" : "signin");
-                setError(null);
-                setInfo(null);
-              }}
-              className="link-underline text-bone uppercase tracking-widest"
+              onClick={() => switchTo("password")}
+              className="link-underline uppercase tracking-widest"
             >
-              {mode === "signin" ? "Create account" : "Sign in"}
+              Sign in with password
             </button>
-          </div>
-          {mode === "signin" && (
-            <div>
-              <button
-                onClick={() => {
-                  setMode("forgot");
-                  setError(null);
-                  setInfo(null);
-                }}
-                className="link-underline uppercase tracking-widest"
-              >
-                Forgot password?
-              </button>
-            </div>
+          ) : (
+            <>
+              <div>
+                <button
+                  onClick={() => switchTo("code")}
+                  className="link-underline text-bone uppercase tracking-widest"
+                >
+                  Sign in with a code instead
+                </button>
+              </div>
+              {mode === "password" && (
+                <div>
+                  <button
+                    onClick={() => switchTo("forgot")}
+                    className="link-underline uppercase tracking-widest"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

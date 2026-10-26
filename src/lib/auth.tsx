@@ -13,7 +13,8 @@ import { api, ApiError, clearTokens, getAccessToken, getRefreshToken, setTokens 
 export type User = {
   id: number;
   full_name: string;
-  email: string;
+  /** Null for customers who signed in by mobile code and never gave one. */
+  email: string | null;
   mobile: string;
   avatar: string | null;
   is_staff: boolean;
@@ -23,36 +24,28 @@ export type User = {
 
 type Session = { access: string; refresh: string; user: User };
 
-/**
- * Thrown by login and register when the account exists but the email address
- * still has to be confirmed. The API has already emailed a 6-digit code;
- * finish with `verifyEmail`.
- */
-export class VerificationRequired extends Error {
-  email: string;
-  retryAfter: number;
-
-  constructor(email: string, detail: string, retryAfter: number) {
-    super(detail);
-    this.email = email;
-    this.retryAfter = retryAfter;
-  }
-}
+/** What the API says after sending a sign-in code. */
+export type CodeSent = {
+  kind: "email" | "mobile";
+  /** Canonical form: lower-cased email or +91XXXXXXXXXX. Send it back to verify. */
+  identifier: string;
+  /** Where it went: "email", "whatsapp", or both. Empty while a recent code is still live. */
+  channels: string[];
+  retry_after: number;
+  is_new: boolean;
+  detail: string;
+};
 
 type AuthCtx = {
   user: User | null;
   loading: boolean;
   isAuthenticated: boolean;
+  /** Email or mobile + password. Kept for staff; customers sign in by code. */
   login: (email: string, password: string) => Promise<User>;
-  register: (data: {
-    full_name: string;
-    email: string;
-    mobile: string;
-    password: string;
-    confirm_password: string;
-  }) => Promise<User>;
-  verifyEmail: (email: string, code: string) => Promise<User>;
-  resendCode: (email: string) => Promise<{ detail: string; retry_after: number }>;
+  /** Send a 6-digit sign-in code to an email address or mobile number. */
+  requestCode: (identifier: string) => Promise<CodeSent>;
+  /** Exchange the code for a session; creates the account the first time. */
+  verifyCode: (identifier: string, code: string) => Promise<User>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 };
@@ -92,13 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await api<Session>("/auth/login/", { method: "POST", body: { email, password } }),
         );
       } catch (error) {
-        const errors = error instanceof ApiError ? error.errors : undefined;
-        if (error instanceof ApiError && errors?.code === "email_not_verified") {
-          throw new VerificationRequired(
-            String(errors.email ?? email),
-            error.message,
-            Number(errors.retry_after ?? 0),
-          );
+        if (error instanceof ApiError && error.errors?.code === "email_not_verified") {
+          // A customer account on the password form; the code form needs no password.
+          throw new Error("Sign in with a one-time code instead — we'll send it to your email.");
         }
         throw error;
       }
@@ -106,35 +95,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [startSession],
   );
 
-  const register = useCallback(
-    async (payload: Parameters<AuthCtx["register"]>[0]) => {
-      const data = await api<
-        | Session
-        | { verification_required: true; email: string; detail: string; retry_after: number }
-      >("/auth/register/", { method: "POST", body: payload });
-      if ("verification_required" in data) {
-        throw new VerificationRequired(data.email, data.detail, data.retry_after);
-      }
-      return startSession(data);
-    },
-    [startSession],
+  const requestCode = useCallback(
+    (identifier: string) =>
+      api<CodeSent>("/auth/otp/request/", { method: "POST", body: { identifier } }),
+    [],
   );
 
-  const verifyEmail = useCallback(
-    async (email: string, code: string) =>
+  const verifyCode = useCallback(
+    async (identifier: string, code: string) =>
       startSession(
-        await api<Session>("/auth/verify-email/", { method: "POST", body: { email, code } }),
+        await api<Session>("/auth/otp/verify/", { method: "POST", body: { identifier, code } }),
       ),
     [startSession],
-  );
-
-  const resendCode = useCallback(
-    (email: string) =>
-      api<{ detail: string; retry_after: number }>("/auth/resend-verification/", {
-        method: "POST",
-        body: { email },
-      }),
-    [],
   );
 
   const logout = useCallback(async () => {
@@ -155,13 +127,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       isAuthenticated: user !== null,
       login,
-      register,
-      verifyEmail,
-      resendCode,
+      requestCode,
+      verifyCode,
       logout,
       refreshUser,
     }),
-    [user, loading, login, register, verifyEmail, resendCode, logout, refreshUser],
+    [user, loading, login, requestCode, verifyCode, logout, refreshUser],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
