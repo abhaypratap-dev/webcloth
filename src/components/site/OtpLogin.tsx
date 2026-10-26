@@ -11,6 +11,8 @@ import { useAuth, type CodeSent, type User } from "@/lib/auth";
  *
  * Mobile numbers are offered only when the brand sends codes on WhatsApp.
  */
+const VERIFY_TIMEOUT_MS = 20_000;
+
 export function OtpLogin({ onDone }: { onDone?: (user: User) => void }) {
   const auth = useAuth();
   const { data: settings } = useQuery({
@@ -51,12 +53,24 @@ export function OtpLogin({ onDone }: { onDone?: (user: User) => void }) {
     if (!sent) return;
     setBusy(true);
     setError(null);
+    // Never leave the customer stuck on "Verifying…": a request the browser
+    // or network silently drops would otherwise never settle. If it does
+    // succeed later, the session still starts and the page moves on.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error("This is taking too long. Check your connection and try again.")),
+        VERIFY_TIMEOUT_MS,
+      );
+    });
     try {
-      onDone?.(await auth.verifyCode(sent.identifier, value));
+      onDone?.(await Promise.race([auth.verifyCode(sent.identifier, value), timeout]));
     } catch (e: any) {
       setError(e.message);
       setCode("");
       setBusy(false);
+    } finally {
+      clearTimeout(timer);
     }
   }
 
